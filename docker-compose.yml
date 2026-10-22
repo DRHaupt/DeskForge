@@ -1,0 +1,113 @@
+# DeskForge stack for ONE business.
+#
+#   cp .env.example .env                                   # then edit secrets
+#   cp examples/internal-it.yaml business.config.yaml       # then edit
+#   docker compose up -d
+#
+# Optional profiles:
+#   --profile minio   S3-compatible object storage for attachments
+#   --profile caddy   Caddy reverse proxy with automatic HTTPS (set DOMAIN in .env)
+
+name: ${COMPOSE_PROJECT_NAME:-deskforge}
+
+x-app: &app
+  image: ${DESKFORGE_IMAGE:-deskforge:local}
+  build:
+    context: ${DESKFORGE_SRC:-.}
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql://${POSTGRES_USER:-deskforge}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-deskforge}
+    REDIS_URL: redis://redis:6379
+  volumes:
+    - ./business.config.yaml:/app/config/business.config.yaml:ro
+    - ./branding:/app/config/branding:ro
+    - uploads:/app/storage
+  restart: unless-stopped
+  init: true
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  app:
+    <<: *app
+    command: ["web"]
+    ports:
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  worker:
+    <<: *app
+    command: ["worker"]
+    depends_on:
+      app:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-deskforge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-deskforge}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-deskforge} -d ${POSTGRES_DB:-deskforge}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    profiles: ["minio"]
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-deskforge}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:-change-me-please}
+    volumes:
+      - miniodata:/data
+    ports:
+      - "127.0.0.1:9001:9001"
+
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["caddy"]
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+    depends_on:
+      - app
+
+volumes:
+  pgdata:
+  redisdata:
+  uploads:
+  miniodata:
+  caddydata:

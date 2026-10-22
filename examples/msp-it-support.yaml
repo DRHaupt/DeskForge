@@ -1,0 +1,365 @@
+# DeskForge example: small managed IT services provider (MSP).
+#
+# - Supports several client companies (organizations); requesters are linked to
+#   their company by email domain, and client contacts can see their company's tickets
+# - ITIL-style: incidents, service requests, problems and changes with CAB approval
+# - 24/7 coverage for critical incidents, business hours for everything else
+# - Microsoft Entra ID sign-in for staff, local accounts for client contacts
+#
+# Copy with: scripts/new-business.sh acme-msp msp-it-support
+version: 1
+
+branding:
+  name: Northbeam Managed IT
+  shortName: Northbeam
+  logo: logo.svg
+  favicon: favicon.svg
+  colors:
+    primary: "#1d4ed8"
+    accent: "#14b8a6"
+  supportEmail: help@northbeam-it.example
+  supportPhone: "+1 555 0100"
+  portalWelcome: |
+    Welcome to the Northbeam client portal. Report an outage, request a change,
+    or browse our self-help guides. For anything business-critical, call us 24/7.
+  footer: "Northbeam Managed IT · 24/7 critical support: +1 555 0100"
+
+locale:
+  timezone: America/New_York
+  language: en
+  dateFormat: yyyy-MM-dd
+  timeFormat: HH:mm
+  weekStartsOn: mon
+  businessHours:
+    mon: [{ start: "08:00", end: "18:00" }]
+    tue: [{ start: "08:00", end: "18:00" }]
+    wed: [{ start: "08:00", end: "18:00" }]
+    thu: [{ start: "08:00", end: "18:00" }]
+    fri: [{ start: "08:00", end: "17:00" }]
+    sat: []
+    sun: []
+  holidays:
+    - { date: "2026-11-26", name: Thanksgiving Day }
+    - { date: "2026-12-25", name: Christmas Day }
+    - { date: "2027-01-01", name: New Year's Day }
+    - { date: "2027-05-31", name: Memorial Day }
+    - { date: "2027-07-05", name: Independence Day (observed) }
+
+auth:
+  local:
+    enabled: true
+    passwordPolicy: { minLength: 14, requireUppercase: true, requireLowercase: true, requireNumber: true, requireSymbol: true }
+    maxFailedAttempts: 5
+    lockoutMinutes: 30
+  oidc:
+    - id: entra
+      type: microsoft-entra-id
+      label: Sign in with Microsoft
+      envPrefix: OIDC_ENTRA
+      autoProvision: true
+      defaultRole: requester
+      allowedDomains: []
+  sessionMaxAgeHours: 10
+  requireTwoFactorForRoles: [admin, team_lead]
+
+portal:
+  requestersSeeOrgTickets: false
+  allowRequesterClose: true
+  requesterCloseStatus: closed
+  reopenOnReply: true
+  reopenStatus: open
+
+features:
+  knowledgeBase: true
+  serviceCatalog: true
+  assets: true
+  problemManagement: true
+  changeManagement: true
+  agileBoards: false
+  csat: true
+  publicSignup: false
+
+priorities:
+  levels:
+    - { key: p1, name: P1 - Critical, color: "#dc2626" }
+    - { key: p2, name: P2 - High, color: "#ea580c" }
+    - { key: p3, name: P3 - Medium, color: "#ca8a04" }
+    - { key: p4, name: P4 - Low, color: "#64748b" }
+  impact:
+    - { key: company, name: Whole company }
+    - { key: department, name: Department or site }
+    - { key: individual, name: One person }
+  urgency:
+    - { key: critical, name: Work has stopped }
+    - { key: high, name: Work is degraded }
+    - { key: normal, name: Workaround available }
+  matrix:
+    company: { critical: p1, high: p2, normal: p3 }
+    department: { critical: p2, high: p2, normal: p3 }
+    individual: { critical: p3, high: p3, normal: p4 }
+  default: p3
+
+sla:
+  enabled: true
+  pauseStatuses: [waiting_on_customer, scheduled]
+  warningPercent: 80
+  policies:
+    - { key: p1_critical, name: P1 Critical (24/7), priorities: [p1], firstResponse: 15m, resolution: 4h, calendar: always }
+    - { key: p2_high, name: P2 High, priorities: [p2], firstResponse: 1h, resolution: 8h }
+    - { key: p3_medium, name: P3 Medium, priorities: [p3], firstResponse: 4h, resolution: 3d }
+    - { key: p4_low, name: P4 Low, priorities: [p4], firstResponse: 1d, resolution: 10d }
+  escalation:
+    notifyOnWarning: true
+    notifyOnBreach: true
+    reassignOnBreach: true
+    raisePriorityOnBreach: false
+
+teams:
+  - key: service_desk
+    name: Service Desk
+    description: Tier 1 — triage, password resets, how-to questions.
+    email: help@northbeam-it.example
+    assignment: round_robin
+    members: [mia.chen@northbeam-it.example, leo.okafor@northbeam-it.example, ana.silva@northbeam-it.example]
+    leads: [dana.whitfield@northbeam-it.example]
+    escalateTo: { team: systems }
+  - key: systems
+    name: Systems & Cloud
+    description: Tier 2 — servers, Microsoft 365, backups, networking.
+    assignment: load_balanced
+    members: [raj.patel@northbeam-it.example, emma.novak@northbeam-it.example]
+    leads: [dana.whitfield@northbeam-it.example]
+    escalateTo: { user: dana.whitfield@northbeam-it.example }
+  - key: field_services
+    name: Field Services
+    description: On-site visits, hardware swaps, cabling.
+    assignment: manual
+    members: [carlos.mendez@northbeam-it.example]
+    leads: [dana.whitfield@northbeam-it.example]
+  - key: security
+    name: Security
+    description: Phishing, compromised accounts, endpoint alerts.
+    email: security@northbeam-it.example
+    assignment: round_robin
+    members: [raj.patel@northbeam-it.example, emma.novak@northbeam-it.example]
+    leads: [dana.whitfield@northbeam-it.example]
+
+categories:
+  - key: end_user
+    name: End-user computing
+    children:
+      - key: laptop
+        name: Laptop / desktop
+        children:
+          - { key: battery, name: Battery }
+          - { key: performance, name: Slow or freezing }
+          - { key: hardware_fault, name: Hardware fault }
+      - { key: peripherals, name: Monitors & peripherals }
+      - { key: printing, name: Printing & scanning }
+  - key: m365
+    name: Microsoft 365
+    children:
+      - { key: outlook, name: Outlook & email }
+      - { key: teams, name: Teams }
+      - { key: sharepoint, name: SharePoint & OneDrive }
+      - { key: licensing, name: Licensing }
+  - key: identity
+    name: Identity & access
+    children:
+      - { key: password_reset, name: Password reset / MFA }
+      - { key: onboarding, name: New starter }
+      - { key: offboarding, name: Leaver }
+  - key: infrastructure
+    name: Infrastructure
+    children:
+      - { key: network, name: Network & firewall }
+      - { key: server, name: Server }
+      - { key: backup, name: Backup & recovery }
+  - key: security
+    name: Security
+    children:
+      - { key: phishing, name: Phishing report }
+      - { key: malware, name: Malware alert }
+
+ticketTypes:
+  - key: incident
+    name: Incident
+    description: Something is broken or degraded.
+    prefix: INC
+    numberPadding: 7
+    defaultPriority: p3
+    defaultTeam: service_desk
+    fields:
+      - { key: affected_users, label: How many people are affected?, type: number, min: 1 }
+      - { key: affected_device, label: Affected device, type: asset }
+      - { key: error_message, label: Exact error message, type: textarea }
+      - { key: environment, label: Environment, type: dropdown, options: [Office, Remote / home, Data center, Cloud] }
+    workflow: &itil_workflow
+      initial: new
+      states:
+        - { key: new, name: New, category: new, color: "#6366f1" }
+        - { key: assigned, name: Assigned, category: open, color: "#2563eb" }
+        - { key: in_progress, name: In Progress, category: open, portalName: Being worked on, color: "#0891b2" }
+        - { key: waiting_on_customer, name: Waiting on Customer, category: pending, pausesSla: true, portalName: Waiting for your reply, color: "#d97706" }
+        - { key: waiting_on_vendor, name: Waiting on Vendor, category: pending, color: "#b45309" }
+        - { key: scheduled, name: Scheduled, category: pending, pausesSla: true, portalName: Scheduled, color: "#7c3aed" }
+        - { key: resolved, name: Resolved, category: resolved, color: "#16a34a" }
+        - { key: closed, name: Closed, category: closed, color: "#475569" }
+        - { key: open, name: Reopened, category: open, color: "#db2777" }
+      transitions:
+        - { from: [new, open], to: assigned, name: Assign, roles: [agent, team_lead, admin] }
+        - { from: [new, assigned, open, waiting_on_customer, waiting_on_vendor, scheduled], to: in_progress, name: Start work, roles: [agent, team_lead, admin] }
+        - { from: [assigned, in_progress, open], to: waiting_on_customer, name: Ask customer, roles: [agent, team_lead, admin] }
+        - { from: [assigned, in_progress, open], to: waiting_on_vendor, name: Wait on vendor, roles: [agent, team_lead, admin], requireComment: true }
+        - { from: [assigned, in_progress, open], to: scheduled, name: Schedule visit, roles: [agent, team_lead, admin] }
+        - { from: [waiting_on_customer], to: open, name: Customer replied, roles: [agent, team_lead, admin, requester] }
+        - { from: [new, assigned, in_progress, open, waiting_on_customer, waiting_on_vendor, scheduled], to: resolved, name: Resolve, roles: [agent, team_lead, admin], requireComment: true }
+        - { from: [resolved], to: open, name: Reopen, roles: [agent, team_lead, admin, requester] }
+        - { from: [resolved], to: closed, name: Close, roles: [agent, team_lead, admin, requester] }
+        - { from: [new, assigned, waiting_on_customer], to: closed, name: Withdraw, roles: [requester, team_lead, admin] }
+        - { from: [closed], to: open, name: Reopen, roles: [team_lead, admin] }
+
+  - key: service_request
+    name: Service Request
+    description: Request something new — access, hardware, software, a new starter.
+    prefix: REQ
+    defaultPriority: p4
+    defaultTeam: service_desk
+    fields:
+      - { key: needed_by, label: Needed by, type: date }
+      - { key: cost_center, label: Cost center, type: text }
+    workflow: *itil_workflow
+
+  - key: problem
+    name: Problem
+    description: Underlying cause of one or more incidents.
+    prefix: PRB
+    defaultPriority: p3
+    defaultTeam: systems
+    portalVisible: false
+    feature: problemManagement
+    fields:
+      - { key: affected_service, label: Affected service, type: dropdown, options: [Email, File shares, VPN, Line-of-business app, Backups, Other], required: true }
+    workflow:
+      initial: new
+      states:
+        - { key: new, name: New, category: new }
+        - { key: investigating, name: Investigating, category: open }
+        - { key: known_error, name: Known Error, category: open }
+        - { key: fix_in_progress, name: Fix in Progress, category: open }
+        - { key: resolved, name: Resolved, category: resolved }
+        - { key: closed, name: Closed, category: closed }
+      transitions:
+        - { from: [new], to: investigating, name: Investigate, roles: [agent, team_lead, admin] }
+        - { from: [investigating], to: known_error, name: Mark known error, roles: [agent, team_lead, admin], requireComment: true }
+        - { from: [investigating, known_error], to: fix_in_progress, name: Start fix, roles: [agent, team_lead, admin] }
+        - { from: [investigating, known_error, fix_in_progress], to: resolved, name: Resolve, roles: [agent, team_lead, admin], requireComment: true }
+        - { from: [resolved], to: closed, name: Close, roles: [team_lead, admin] }
+        - { from: [resolved, closed], to: investigating, name: Reopen, roles: [team_lead, admin] }
+
+  - key: change
+    name: Change
+    description: Planned change to production systems.
+    prefix: CHG
+    defaultPriority: p3
+    defaultTeam: systems
+    portalVisible: false
+    feature: changeManagement
+    fields:
+      - { key: change_type, label: Change type, type: dropdown, options: [Standard, Normal, Emergency], required: true }
+      - { key: affected_clients, label: Affected clients, type: textarea }
+    workflow:
+      initial: draft
+      states:
+        - { key: draft, name: Draft, category: new }
+        - { key: awaiting_approval, name: Awaiting CAB, category: pending }
+        - { key: approved, name: Approved, category: open }
+        - { key: rejected, name: Rejected, category: closed }
+        - { key: implementing, name: Implementing, category: open }
+        - { key: completed, name: Completed, category: resolved }
+        - { key: failed, name: Failed / Rolled back, category: resolved }
+        - { key: closed, name: Closed, category: closed }
+      transitions:
+        - { from: [draft, rejected], to: awaiting_approval, name: Submit for approval, roles: [agent, team_lead, admin] }
+        - { from: [awaiting_approval], to: approved, name: Approve, roles: [team_lead, admin] }
+        - { from: [awaiting_approval], to: rejected, name: Reject, roles: [team_lead, admin], requireComment: true }
+        - { from: [approved], to: implementing, name: Start implementation, roles: [agent, team_lead, admin] }
+        - { from: [implementing], to: completed, name: Complete, roles: [agent, team_lead, admin] }
+        - { from: [implementing], to: failed, name: Roll back, roles: [agent, team_lead, admin], requireComment: true }
+        - { from: [completed, failed, rejected], to: closed, name: Close, roles: [team_lead, admin] }
+
+email:
+  enabled: true
+  fromName: Northbeam Support
+  mailboxes:
+    - { address: help@northbeam-it.example, team: service_desk, ticketType: incident, mode: imap, imapEnvPrefix: IMAP_HELP }
+    - { address: security@northbeam-it.example, team: security, ticketType: incident, mode: webhook }
+  createUnknownSenders: true
+
+csat:
+  sendOn: resolved
+  delayMinutes: 30
+  scale: 5
+  question: How did we do on this ticket?
+
+catalog:
+  - key: new_starter
+    name: New starter setup
+    description: Accounts, licenses and a laptop for a new employee.
+    icon: user-plus
+    group: People
+    ticketType: service_request
+    team: service_desk
+    priority: p3
+    requiresApproval: true
+    fields:
+      - { key: full_name, label: Full name, type: text, required: true }
+      - { key: start_date, label: Start date, type: date, required: true }
+      - { key: job_title, label: Job title, type: text, required: true }
+      - { key: hardware, label: Hardware, type: dropdown, options: [Standard laptop, Power laptop, Desktop, None], required: true }
+      - { key: licenses, label: Licenses, type: multiselect, options: [Microsoft 365 Business Premium, Adobe Acrobat, Line-of-business app] }
+  - key: leaver
+    name: Leaver / offboarding
+    icon: user-minus
+    group: People
+    ticketType: service_request
+    team: service_desk
+    priority: p2
+    fields:
+      - { key: full_name, label: Employee name, type: text, required: true }
+      - { key: last_day, label: Last day, type: date, required: true }
+      - { key: mailbox_delegate, label: Forward mailbox to, type: text }
+  - key: shared_mailbox
+    name: Shared mailbox
+    icon: mail
+    group: Microsoft 365
+    ticketType: service_request
+    team: systems
+    fields:
+      - { key: mailbox_address, label: Address, type: text, required: true }
+      - { key: members, label: Who needs access?, type: textarea, required: true }
+  - key: replacement_hardware
+    name: Replacement hardware
+    icon: monitor
+    group: Hardware
+    ticketType: service_request
+    team: field_services
+    requiresApproval: true
+    fields:
+      - { key: item, label: Item, type: dropdown, options: [Monitor, Docking station, Keyboard & mouse, Headset, Laptop], required: true }
+      - { key: reason, label: Reason, type: textarea, required: true }
+
+organizations:
+  - { name: Acme Dental Group, slug: acme-dental, domains: [acmedental.example] }
+  - { name: Brightside Law LLP, slug: brightside-law, domains: [brightsidelaw.example] }
+  - { name: Northwind Logistics, slug: northwind, domains: [northwind-logistics.example] }
+  - { name: Harbor Street Bakery, slug: harbor-bakery, domains: [harborbakery.example] }
+
+itsm:
+  riskLevels:
+    - { key: low, name: Low }
+    - { key: medium, name: Medium }
+    - { key: high, name: High }
+  cabMembers: [dana.whitfield@northbeam-it.example, raj.patel@northbeam-it.example]
+  cabQuorum: 1
+  cabRequiredForRisk: [medium, high]

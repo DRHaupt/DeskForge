@@ -1,0 +1,5 @@
+# Used by `docker compose --profile caddy up -d`. Set DOMAIN in .env.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:3000
+}

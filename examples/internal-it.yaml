@@ -1,0 +1,294 @@
+# DeskForge example: internal IT desk for a school club or small organization.
+#
+# - A handful of volunteer/part-time agents, one "Help Desk" queue plus an infrastructure team
+# - Google Workspace sign-in for members, local accounts for admins
+# - Knowledge base, service catalog, asset tracking and a Kanban board for internal projects
+# - No CSAT, no ITIL change management
+#
+# Copy with: scripts/new-business.sh my-org internal-it
+version: 1
+
+branding:
+  name: Riverside Tech Club IT
+  shortName: RTC IT
+  logo: logo.svg
+  favicon: favicon.svg
+  colors:
+    primary: "#0f766e"
+    accent: "#f59e0b"
+  supportEmail: it@riverside-club.example
+  portalWelcome: |
+    Something not working? Need access to a club account or a loaner laptop?
+    Search the guides below or open a request — a club volunteer will pick it up.
+  footer: Riverside Tech Club · Volunteer-run IT help desk
+
+locale:
+  timezone: America/Chicago
+  language: en
+  dateFormat: MM/dd/yyyy
+  timeFormat: "h:mm a"
+  weekStartsOn: sun
+  businessHours:
+    mon: [{ start: "15:00", end: "19:00" }]
+    tue: [{ start: "15:00", end: "19:00" }]
+    wed: [{ start: "15:00", end: "19:00" }]
+    thu: [{ start: "15:00", end: "19:00" }]
+    fri: [{ start: "15:00", end: "18:00" }]
+    sat: [{ start: "10:00", end: "14:00" }]
+    sun: []
+  holidays:
+    - { date: "2026-11-26", name: Thanksgiving }
+    - { date: "2026-12-24", name: Winter break }
+    - { date: "2026-12-25", name: Winter break }
+    - { date: "2026-12-31", name: Winter break }
+    - { date: "2027-01-01", name: New Year's Day }
+
+auth:
+  local:
+    enabled: true
+    passwordPolicy: { minLength: 12, requireUppercase: true, requireLowercase: true, requireNumber: true }
+  oidc:
+    - id: google
+      type: google
+      label: Sign in with Google
+      envPrefix: OIDC_GOOGLE
+      autoProvision: true
+      defaultRole: requester
+      allowedDomains: [riverside-club.example]
+  sessionMaxAgeHours: 24
+  requireTwoFactorForRoles: [admin]
+
+portal:
+  requestersSeeOrgTickets: false
+  allowRequesterClose: true
+  requesterCloseStatus: closed
+  reopenOnReply: true
+  reopenStatus: open
+
+features:
+  knowledgeBase: true
+  serviceCatalog: true
+  assets: true
+  problemManagement: false
+  changeManagement: false
+  agileBoards: true
+  csat: false
+  publicSignup: false
+
+priorities:
+  levels:
+    - { key: urgent, name: Urgent, color: "#dc2626" }
+    - { key: high, name: High, color: "#ea580c" }
+    - { key: normal, name: Normal, color: "#2563eb" }
+    - { key: low, name: Low, color: "#64748b" }
+  impact:
+    - { key: everyone, name: Everyone / whole club }
+    - { key: group, name: A group or event }
+    - { key: one_person, name: Just me }
+  urgency:
+    - { key: now, name: Blocking me right now }
+    - { key: soon, name: Needed this week }
+    - { key: whenever, name: No rush }
+  matrix:
+    everyone: { now: urgent, soon: high, whenever: normal }
+    group: { now: high, soon: normal, whenever: normal }
+    one_person: { now: normal, soon: normal, whenever: low }
+  default: normal
+
+sla:
+  enabled: true
+  pauseStatuses: [waiting_on_requester, on_hold]
+  warningPercent: 75
+  policies:
+    - { key: urgent, name: Urgent, priorities: [urgent], firstResponse: 1h, resolution: 4h }
+    - { key: high, name: High, priorities: [high], firstResponse: 4h, resolution: 2d }
+    - { key: standard, name: Standard, priorities: [normal, low], firstResponse: 1d, resolution: 5d }
+  escalation:
+    notifyOnWarning: true
+    notifyOnBreach: true
+    reassignOnBreach: false
+
+teams:
+  - key: help_desk
+    name: Help Desk
+    description: First stop for every request.
+    email: it@riverside-club.example
+    assignment: round_robin
+    members: [sam.rivera@riverside-club.example, priya.nair@riverside-club.example, jordan.lee@riverside-club.example]
+    leads: [alex.morgan@riverside-club.example]
+    escalateTo: { team: infrastructure }
+  - key: infrastructure
+    name: Infrastructure
+    description: Network, servers, accounts and the club website.
+    assignment: manual
+    members: [taylor.brooks@riverside-club.example]
+    leads: [alex.morgan@riverside-club.example]
+
+categories:
+  - key: accounts
+    name: Accounts & Access
+    children:
+      - { key: password, name: Password reset }
+      - { key: shared_drive, name: Shared drive access }
+      - { key: email, name: Email & calendar }
+  - key: hardware
+    name: Hardware
+    children:
+      - key: laptop
+        name: Laptop
+        children:
+          - { key: battery, name: Battery }
+          - { key: screen, name: Screen }
+          - { key: keyboard, name: Keyboard }
+      - { key: printer, name: Printer }
+      - { key: projector, name: Projector & AV }
+  - key: network
+    name: Network
+    children:
+      - { key: wifi, name: Wi-Fi }
+      - { key: vpn, name: Remote access }
+  - key: software
+    name: Software
+    children:
+      - { key: install, name: Install request }
+      - { key: license, name: License }
+  - key: website
+    name: Club website
+
+ticketTypes:
+  - key: incident
+    name: Problem Report
+    description: Something is broken or not working as expected.
+    prefix: INC
+    numberPadding: 7
+    defaultPriority: normal
+    defaultTeam: help_desk
+    portalVisible: true
+    fields:
+      - { key: location, label: Where are you?, type: dropdown, options: [Lab A, Lab B, Workshop, Remote], required: true }
+      - { key: device, label: Device, type: asset, required: false, helpText: Pick the device that has the problem, if it is one of ours. }
+      - { key: steps_tried, label: What have you tried so far?, type: textarea }
+    workflow: &standard_workflow
+      initial: new
+      states:
+        - { key: new, name: New, category: new, color: "#6366f1" }
+        - { key: open, name: Open, category: open, color: "#2563eb" }
+        - { key: in_progress, name: In Progress, category: open, portalName: Being worked on, color: "#0891b2" }
+        - { key: waiting_on_requester, name: Waiting on Requester, category: pending, pausesSla: true, portalName: Waiting for your reply, color: "#d97706" }
+        - { key: on_hold, name: On Hold, category: pending, pausesSla: true, color: "#a16207" }
+        - { key: resolved, name: Resolved, category: resolved, color: "#16a34a" }
+        - { key: closed, name: Closed, category: closed, color: "#475569" }
+      transitions:
+        - { from: [new], to: open, name: Accept, roles: [agent, team_lead, admin] }
+        - { from: [new, open, waiting_on_requester, on_hold], to: in_progress, name: Start work, roles: [agent, team_lead, admin] }
+        - { from: [new, open, in_progress], to: waiting_on_requester, name: Ask requester, roles: [agent, team_lead, admin] }
+        - { from: [open, in_progress], to: on_hold, name: Put on hold, roles: [agent, team_lead, admin], requireComment: true }
+        - { from: [waiting_on_requester, on_hold], to: open, name: Resume, roles: [agent, team_lead, admin, requester] }
+        - { from: [new, open, in_progress, waiting_on_requester, on_hold], to: resolved, name: Resolve, roles: [agent, team_lead, admin], requireComment: true }
+        - { from: [resolved], to: open, name: Reopen, roles: [agent, team_lead, admin, requester] }
+        - { from: [new, open, in_progress, waiting_on_requester, on_hold, resolved], to: closed, name: Close, roles: [team_lead, admin, requester] }
+        - { from: [resolved], to: closed, name: Close, roles: [agent] }
+        - { from: [closed], to: open, name: Reopen, roles: [team_lead, admin] }
+
+  - key: service_request
+    name: Request
+    description: Ask for something new — an account, access, a loaner or software.
+    prefix: REQ
+    defaultPriority: normal
+    defaultTeam: help_desk
+    fields:
+      - { key: needed_by, label: Needed by, type: date }
+      - { key: justification, label: What is it for?, type: textarea, required: true }
+    workflow: *standard_workflow
+
+  - key: question
+    name: Question
+    description: Not broken, just need to know how.
+    prefix: QST
+    defaultPriority: low
+    defaultTeam: help_desk
+    workflow: *standard_workflow
+
+  - key: task
+    name: Project Task
+    description: Internal work item for the IT volunteers (not visible on the portal).
+    prefix: TSK
+    defaultPriority: normal
+    defaultTeam: infrastructure
+    portalVisible: false
+    fields:
+      - { key: story_points, label: Effort (points), type: number, min: 0, max: 21 }
+      - { key: project, label: Project, type: dropdown, options: [Website refresh, Lab rebuild, Wi-Fi upgrade, Other] }
+    workflow:
+      initial: backlog
+      states:
+        - { key: backlog, name: Backlog, category: new }
+        - { key: todo, name: To Do, category: open }
+        - { key: doing, name: Doing, category: open }
+        - { key: review, name: Review, category: open }
+        - { key: done, name: Done, category: resolved }
+        - { key: cancelled, name: Cancelled, category: closed }
+      transitions:
+        - { from: "*", to: backlog, roles: [agent, team_lead, admin] }
+        - { from: "*", to: todo, roles: [agent, team_lead, admin] }
+        - { from: "*", to: doing, roles: [agent, team_lead, admin] }
+        - { from: "*", to: review, roles: [agent, team_lead, admin] }
+        - { from: "*", to: done, roles: [agent, team_lead, admin] }
+        - { from: "*", to: cancelled, roles: [team_lead, admin] }
+
+boards:
+  - key: it_projects
+    name: IT Projects
+    ticketTypes: [task]
+    team: infrastructure
+    columns:
+      - { name: Backlog, states: [backlog] }
+      - { name: To Do, states: [todo] }
+      - { name: Doing, states: [doing], wipLimit: 4 }
+      - { name: Review, states: [review] }
+      - { name: Done, states: [done] }
+
+email:
+  enabled: true
+  fromName: Riverside Tech Club IT
+  mailboxes:
+    - { address: it@riverside-club.example, team: help_desk, ticketType: incident, mode: imap, imapEnvPrefix: IMAP_IT, pollSeconds: 60 }
+  createUnknownSenders: false
+
+catalog:
+  - key: loaner_laptop
+    name: Borrow a loaner laptop
+    description: Check out a club laptop for up to two weeks.
+    icon: laptop
+    group: Hardware
+    ticketType: service_request
+    team: help_desk
+    requiresApproval: true
+    approvers: [alex.morgan@riverside-club.example]
+    fields:
+      - { key: pickup_date, label: Pickup date, type: date, required: true }
+      - { key: return_date, label: Return date, type: date, required: true }
+      - { key: purpose, label: What will you use it for?, type: textarea, required: true }
+  - key: shared_drive_access
+    name: Shared drive access
+    description: Get access to a project or committee folder.
+    icon: folder
+    group: Accounts
+    ticketType: service_request
+    team: help_desk
+    fields:
+      - { key: folder, label: Folder name, type: text, required: true }
+      - { key: access_level, label: Access level, type: dropdown, options: [View, Edit], required: true }
+  - key: software_install
+    name: Install software on a lab machine
+    icon: package
+    group: Software
+    ticketType: service_request
+    team: infrastructure
+    requiresApproval: true
+    fields:
+      - { key: software_name, label: Software, type: text, required: true }
+      - { key: machines, label: Which machines?, type: multiselect, options: [Lab A, Lab B, Workshop], required: true }
+      - { key: license_url, label: License or download link, type: text }
+
+organizations: []

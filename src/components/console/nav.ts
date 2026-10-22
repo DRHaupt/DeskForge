@@ -1,0 +1,46 @@
+/** Console navigation. Items are filtered by permission and feature flag on the server. */
+import type { FeatureName } from "@/core/config/schema";
+import type { Permission } from "@/core/rbac/permissions";
+
+export type NavItem = {
+  href: string;
+  label: string;
+  icon: string;
+  /** Any one of these permissions shows the item. */
+  permissions?: Permission[];
+  feature?: FeatureName;
+};
+
+export type NavSection = { label?: string; items: NavItem[] };
+
+export const NAV: NavSection[] = [
+  {
+    items: [
+      { href: "/agent", label: "Home", icon: "home", permissions: ["ticket.view_team", "ticket.view_all"] },
+      { href: "/agent/tickets", label: "Tickets", icon: "inbox", permissions: ["ticket.view_team", "ticket.view_all"] },
+      { href: "/agent/search", label: "Search", icon: "list", permissions: ["ticket.view_team", "ticket.view_all"] },
+      { href: "/agent/boards", label: "Boards", icon: "kanban", permissions: ["ticket.view_team", "ticket.view_all"], feature: "agileBoards" },
+      { href: "/agent/approvals", label: "Approvals", icon: "check", permissions: ["catalog.approve", "change.approve", "ticket.view_team"] },
+      { href: "/agent/kb", label: "Knowledge base", icon: "book", permissions: ["kb.author", "kb.view_internal"], feature: "knowledgeBase" },
+      { href: "/agent/known-errors", label: "Known errors", icon: "alert", permissions: ["ticket.comment_internal"], feature: "problemManagement" },
+      { href: "/agent/assets", label: "Assets", icon: "monitor", permissions: ["asset.view"], feature: "assets" },
+      { href: "/agent/reports", label: "Reports", icon: "chart", permissions: ["report.view"] },
+      { href: "/agent/canned", label: "Canned responses", icon: "message", permissions: ["ticket.reply"] },
+    ],
+  },
+  {
+    label: "Administration",
+    items: [
+      { href: "/admin/users", label: "Users", icon: "users", permissions: ["user.view"] },
+      { href: "/admin/roles", label: "Roles", icon: "shield", permissions: ["role.manage"] },
+      { href: "/admin/teams", label: "Teams", icon: "users-round", permissions: ["team.manage"] },
+      { href: "/admin/organizations", label: "Organizations", icon: "building", permissions: ["org.view"] },
+      { href: "/admin/catalog", label: "Service catalog", icon: "bag", permissions: ["catalog.manage"], feature: "serviceCatalog" },
+      { href: "/admin/automations", label: "Automations", icon: "zap", permissions: ["automation.manage"] },
+      { href: "/admin/webhooks", label: "Webhooks", icon: "webhook", permissions: ["webhook.manage"] },
+      { href: "/admin/api-keys", label: "API keys", icon: "key", permissions: ["apikey.manage"] },
+      { href: "/admin/email", label: "Email log", icon: "message", permissions: ["config.view"] },
+      { href: "/admin/audit", label: "Audit log", icon: "scroll", permissions: ["audit.view"] },
+    ],
+  },
+];

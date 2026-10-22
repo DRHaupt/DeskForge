@@ -1,0 +1,1172 @@
+// DeskForge data model.
+//
+// Conventions
+// - Every table has tenant_id (nullable), created_at, updated_at. In single-tenant
+//   mode tenant_id is always NULL. See DECISIONS.md (D-004) for the multi-tenant plan.
+// - Tables and columns are snake_case in Postgres, camelCase in TypeScript.
+// - Tickets, comments and knowledge articles are soft-deleted via deleted_at.
+// - Values that come from business.config.yaml (status, priority, impact, urgency)
+//   are stored as string keys, not enums, so each business can define its own.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums (fixed by the product, not by the business) ─────────────────────
+
+enum StatusCategory {
+  NEW
+  OPEN
+  PENDING
+  RESOLVED
+  CLOSED
+}
+
+enum TicketSource {
+  PORTAL
+  EMAIL
+  AGENT
+  API
+  CATALOG
+  AUTOMATION
+}
+
+enum CommentVisibility {
+  PUBLIC
+  INTERNAL
+}
+
+enum CommentSource {
+  WEB
+  EMAIL
+  API
+  SYSTEM
+}
+
+enum FieldType {
+  TEXT
+  TEXTAREA
+  NUMBER
+  DROPDOWN
+  MULTISELECT
+  DATE
+  USER
+  ASSET
+  CHECKBOX
+}
+
+enum AssignmentStrategy {
+  ROUND_ROBIN
+  LOAD_BALANCED
+  MANUAL
+}
+
+enum RelationshipType {
+  PARENT_CHILD // source is parent, target is child
+  DUPLICATE_OF // source is the duplicate, target is the original
+  RELATED
+  CAUSED_BY // source (incident) caused by target (problem)
+  BLOCKS
+  AFFECTS_ASSET // source ticket affects target asset
+}
+
+enum SlaMetric {
+  FIRST_RESPONSE
+  RESOLUTION
+}
+
+enum SlaStatus {
+  RUNNING
+  PAUSED
+  MET
+  BREACHED
+  CANCELLED
+}
+
+enum SlaCalendar {
+  BUSINESS_HOURS
+  ALWAYS
+}
+
+enum ArticleStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ArticleVisibility {
+  PUBLIC
+  INTERNAL
+}
+
+enum ApprovalStatus {
+  NOT_REQUIRED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ApprovalKind {
+  CATALOG
+  CHANGE_CAB
+}
+
+enum ActorType {
+  USER
+  API_KEY
+  SYSTEM
+}
+
+enum DeliveryStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+enum InboundEmailStatus {
+  RECEIVED
+  CREATED_TICKET
+  APPENDED_COMMENT
+  IGNORED
+  FAILED
+}
+
+// ─── People, access, organizations ─────────────────────────────────────────
+
+/// A customer company the business serves (central for MSPs).
+model Organization {
+  id        String   @id @default(cuid())
+  tenantId  String?  @map("tenant_id")
+  name      String
+  slug      String   @unique
+  domains   String[] /// email domains used to auto-link requesters
+  phone     String?
+  notes     String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users   User[]
+  tickets Ticket[]
+  assets  Asset[]
+
+  @@index([tenantId])
+  @@map("organizations")
+}
+
+model User {
+  id                String    @id @default(cuid())
+  tenantId          String?   @map("tenant_id")
+  email             String    @unique
+  name              String
+  passwordHash      String?   @map("password_hash")
+  isActive          Boolean   @default(true) @map("is_active")
+  organizationId    String?   @map("organization_id")
+  /// Requester may see all tickets of their organization in the portal.
+  orgTicketAccess   Boolean   @default(false) @map("org_ticket_access")
+  jobTitle          String?   @map("job_title")
+  phone             String?
+  timezone          String?
+  avatarUrl         String?   @map("avatar_url")
+  lastLoginAt       DateTime? @map("last_login_at")
+  failedLoginCount  Int       @default(0) @map("failed_login_count")
+  lockedUntil       DateTime? @map("locked_until")
+  passwordChangedAt DateTime? @map("password_changed_at")
+  totpSecret        String?   @map("totp_secret")
+  totpEnabled       Boolean   @default(false) @map("totp_enabled")
+  /// Bumped to invalidate all existing sessions for this user.
+  sessionVersion    Int       @default(0) @map("session_version")
+  /// Receive email for ticket activity (in-app notifications are always on).
+  notifyByEmail     Boolean   @default(true) @map("notify_by_email")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  organization        Organization?        @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  roles               UserRole[]
+  identities          UserIdentity[]
+  teamMemberships     TeamMember[]
+  requestedTickets    Ticket[]             @relation("TicketRequester")
+  assignedTickets     Ticket[]             @relation("TicketAssignee")
+  createdTickets      Ticket[]             @relation("TicketCreator")
+  comments            Comment[]
+  watching            TicketWatcher[]
+  statusChanges       StatusHistory[]
+  attachments         Attachment[]
+  articles            KnowledgeArticle[]
+  articleFeedback     ArticleFeedback[]
+  catalogRequests     CatalogRequest[]
+  approvals           Approval[]
+  assets              Asset[]
+  notifications       Notification[]
+  savedViews          SavedView[]
+  csatResponses       CSATResponse[]
+  apiKeys             ApiKey[]
+  cannedResponses     CannedResponse[]
+  automations         Automation[]
+  auditLogs           AuditLog[]
+  escalationForTeam   Team[]               @relation("TeamEscalationUser")
+  passwordResetTokens PasswordResetToken[]
+
+  @@index([tenantId])
+  @@index([organizationId])
+  @@map("users")
+}
+
+/// Links an external identity provider account (OIDC) to a local user.
+model UserIdentity {
+  id                String   @id @default(cuid())
+  tenantId          String?  @map("tenant_id")
+  userId            String   @map("user_id")
+  provider          String
+  providerAccountId String   @map("provider_account_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("user_identities")
+}
+
+/// Roles are editable in the admin UI. Permission names come from the code catalog.
+model Role {
+  id          String   @id @default(cuid())
+  tenantId    String?  @map("tenant_id")
+  key         String   @unique
+  name        String
+  description String?
+  permissions String[]
+  /// Built-in roles can be edited but not deleted.
+  isSystem    Boolean  @default(false) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  users UserRole[]
+
+  @@index([tenantId])
+  @@map("roles")
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  tenantId  String?  @map("tenant_id")
+  userId    String   @map("user_id")
+  roleId    String   @map("role_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+/// A team is also a queue: tickets are routed to teams.
+model Team {
+  id                 String             @id @default(cuid())
+  tenantId           String?            @map("tenant_id")
+  key                String             @unique
+  name               String
+  description        String?
+  email              String?
+  assignmentStrategy AssignmentStrategy @default(MANUAL) @map("assignment_strategy")
+  /// Last user picked by round-robin, so the next pick continues from there.
+  lastAssignedUserId String?            @map("last_assigned_user_id")
+  escalationTeamId   String?            @map("escalation_team_id")
+  escalationUserId   String?            @map("escalation_user_id")
+  isActive           Boolean            @default(true) @map("is_active")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  escalationTeam  Team?            @relation("TeamEscalation", fields: [escalationTeamId], references: [id], onDelete: SetNull)
+  escalatedFrom   Team[]           @relation("TeamEscalation")
+  escalationUser  User?            @relation("TeamEscalationUser", fields: [escalationUserId], references: [id], onDelete: SetNull)
+  members         TeamMember[]
+  tickets         Ticket[]
+  catalogItems    CatalogItem[]
+  savedViews      SavedView[]
+  cannedResponses CannedResponse[]
+
+  @@index([tenantId])
+  @@map("teams")
+}
+
+model TeamMember {
+  id          String   @id @default(cuid())
+  tenantId    String?  @map("tenant_id")
+  teamId      String   @map("team_id")
+  userId      String   @map("user_id")
+  isLead      Boolean  @default(false) @map("is_lead")
+  /// Unavailable members are skipped by automatic assignment.
+  isAvailable Boolean  @default(true) @map("is_available")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([userId])
+  @@map("team_members")
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  tenantId    String?   @map("tenant_id")
+  name        String
+  /// First characters of the key, shown in the UI to identify it.
+  prefix      String
+  hashedKey   String    @unique @map("hashed_key")
+  permissions String[]
+  createdById String?   @map("created_by_id")
+  lastUsedAt  DateTime? @map("last_used_at")
+  expiresAt   DateTime? @map("expires_at")
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@map("api_keys")
+}
+
+// ─── Ticketing ──────────────────────────────────────────────────────────────
+
+/// Synced from business.config.yaml at startup. Holds the per-type number counter.
+model TicketType {
+  id            String   @id @default(cuid())
+  tenantId      String?  @map("tenant_id")
+  key           String   @unique
+  name          String
+  prefix        String
+  numberPadding Int      @default(7) @map("number_padding")
+  /// Next number to hand out; incremented atomically.
+  nextNumber    Int      @default(1) @map("next_number")
+  description   String?
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  fields  TicketFieldDef[]
+  tickets Ticket[]
+
+  @@index([tenantId])
+  @@map("ticket_types")
+}
+
+model TicketFieldDef {
+  id           String    @id @default(cuid())
+  tenantId     String?   @map("tenant_id")
+  ticketTypeId String    @map("ticket_type_id")
+  key          String
+  label        String
+  fieldType    FieldType @map("field_type")
+  required     Boolean   @default(false)
+  options      Json? /// [{value,label}] for dropdown / multiselect
+  helpText     String?   @map("help_text")
+  order        Int       @default(0)
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  ticketType TicketType         @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
+  values     TicketFieldValue[]
+
+  @@unique([ticketTypeId, key])
+  @@map("ticket_field_defs")
+}
+
+model TicketFieldValue {
+  id          String    @id @default(cuid())
+  tenantId    String?   @map("tenant_id")
+  ticketId    String    @map("ticket_id")
+  fieldDefId  String    @map("field_def_id")
+  valueText   String?   @map("value_text")
+  valueNumber Float?    @map("value_number")
+  valueDate   DateTime? @map("value_date")
+  valueJson   Json?     @map("value_json")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  ticket   Ticket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  fieldDef TicketFieldDef @relation(fields: [fieldDefId], references: [id], onDelete: Cascade)
+
+  @@unique([ticketId, fieldDefId])
+  @@index([fieldDefId, valueText])
+  @@map("ticket_field_values")
+}
+
+model Ticket {
+  id               String         @id @default(cuid())
+  tenantId         String?        @map("tenant_id")
+  number           String         @unique
+  typeId           String         @map("type_id")
+  title            String
+  /// Sanitized HTML.
+  description      String         @default("")
+  /// Plain-text copy used for search and email.
+  descriptionText  String         @default("") @map("description_text")
+  status           String
+  statusCategory   StatusCategory @default(NEW) @map("status_category")
+  priority         String
+  impact           String?
+  urgency          String?
+  source           TicketSource   @default(AGENT)
+  requesterId      String         @map("requester_id")
+  organizationId   String?        @map("organization_id")
+  teamId           String?        @map("team_id")
+  assigneeId       String?        @map("assignee_id")
+  categoryId       String?        @map("category_id")
+  createdById      String?        @map("created_by_id")
+  dueAt            DateTime?      @map("due_at")
+  firstRespondedAt DateTime?      @map("first_responded_at")
+  resolvedAt       DateTime?      @map("resolved_at")
+  closedAt         DateTime?      @map("closed_at")
+  reopenCount      Int            @default(0) @map("reopen_count")
+  mergedIntoId     String?        @map("merged_into_id")
+  /// Message-ID of the email that opened the ticket, for threading replies.
+  emailMessageId   String?        @map("email_message_id")
+  /// Ordering inside agile board columns.
+  boardRank        Float          @default(0) @map("board_rank")
+
+  // Problem management
+  rootCause  String? @map("root_cause")
+  workaround String?
+  knownError Boolean @default(false) @map("known_error")
+
+  // Change management
+  riskLevel      String?        @map("risk_level")
+  changePlan     String?        @map("change_plan")
+  rollbackPlan   String?        @map("rollback_plan")
+  plannedStartAt DateTime?      @map("planned_start_at")
+  plannedEndAt   DateTime?      @map("planned_end_at")
+  cabStatus      ApprovalStatus @default(NOT_REQUIRED) @map("cab_status")
+
+  /// Maintained by a database trigger (see migration). Not written by the app.
+  searchVector Unsupported("tsvector")? @map("search_vector")
+
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  type           TicketType         @relation(fields: [typeId], references: [id])
+  requester      User               @relation("TicketRequester", fields: [requesterId], references: [id])
+  assignee       User?              @relation("TicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  createdBy      User?              @relation("TicketCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  organization   Organization?      @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  team           Team?              @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  category       Category?          @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  mergedInto     Ticket?            @relation("TicketMerge", fields: [mergedIntoId], references: [id], onDelete: SetNull)
+  mergedFrom     Ticket[]           @relation("TicketMerge")
+  fieldValues    TicketFieldValue[]
+  comments       Comment[]
+  attachments    Attachment[]
+  statusHistory  StatusHistory[]
+  watchers       TicketWatcher[]
+  tags           TicketTag[]
+  slaInstances   SLAInstance[]
+  outgoingLinks  Relationship[]     @relation("RelationshipSource")
+  incomingLinks  Relationship[]     @relation("RelationshipTarget")
+  catalogRequest CatalogRequest?
+  approvals      Approval[]
+  notifications  Notification[]
+  csatResponse   CSATResponse?
+  automationRuns AutomationRun[]
+  inboundEmails  InboundEmail[]
+  outboundEmails OutboundEmail[]
+
+  @@index([tenantId])
+  @@index([statusCategory, teamId])
+  @@index([assigneeId, statusCategory])
+  @@index([requesterId])
+  @@index([organizationId])
+  @@index([typeId])
+  @@index([createdAt])
+  @@index([emailMessageId])
+  @@index([searchVector], map: "tickets_search_vector_idx", type: Gin)
+  @@map("tickets")
+}
+
+model Comment {
+  id             String                   @id @default(cuid())
+  tenantId       String?                  @map("tenant_id")
+  ticketId       String                   @map("ticket_id")
+  authorId       String?                  @map("author_id")
+  /// Sanitized HTML.
+  body           String
+  bodyText       String                   @default("") @map("body_text")
+  visibility     CommentVisibility        @default(PUBLIC)
+  source         CommentSource            @default(WEB)
+  /// System events (e.g. "assigned to X") rendered in the timeline.
+  isSystem       Boolean                  @default(false) @map("is_system")
+  mentions       String[] /// user ids
+  emailMessageId String?                  @map("email_message_id")
+  searchVector   Unsupported("tsvector")? @map("search_vector")
+  deletedAt      DateTime?                @map("deleted_at")
+  createdAt      DateTime                 @default(now()) @map("created_at")
+  updatedAt      DateTime                 @updatedAt @map("updated_at")
+
+  ticket      Ticket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author      User?        @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  attachments Attachment[]
+
+  @@index([ticketId, createdAt])
+  @@index([emailMessageId])
+  @@index([searchVector], map: "comments_search_vector_idx", type: Gin)
+  @@map("comments")
+}
+
+model Attachment {
+  id            String   @id @default(cuid())
+  tenantId      String?  @map("tenant_id")
+  ticketId      String?  @map("ticket_id")
+  commentId     String?  @map("comment_id")
+  articleId     String?  @map("article_id")
+  uploaderId    String?  @map("uploader_id")
+  filename      String
+  contentType   String   @map("content_type")
+  size          Int
+  storageDriver String   @map("storage_driver")
+  storageKey    String   @map("storage_key")
+  checksum      String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  ticket   Ticket?           @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  comment  Comment?          @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  article  KnowledgeArticle? @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  uploader User?             @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId])
+  @@index([commentId])
+  @@map("attachments")
+}
+
+model StatusHistory {
+  id          String   @id @default(cuid())
+  tenantId    String?  @map("tenant_id")
+  ticketId    String   @map("ticket_id")
+  fromStatus  String?  @map("from_status")
+  toStatus    String   @map("to_status")
+  changedById String?  @map("changed_by_id")
+  reason      String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  ticket    Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  changedBy User?  @relation(fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([ticketId, createdAt])
+  @@map("status_history")
+}
+
+/// Watchers and CC recipients. Either a user or a bare email address.
+model TicketWatcher {
+  id        String   @id @default(cuid())
+  tenantId  String?  @map("tenant_id")
+  ticketId  String   @map("ticket_id")
+  userId    String?  @map("user_id")
+  email     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([ticketId, userId])
+  @@unique([ticketId, email])
+  @@map("ticket_watchers")
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  tenantId  String?  @map("tenant_id")
+  name      String   @unique
+  color     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tickets TicketTag[]
+
+  @@map("tags")
+}
+
+model TicketTag {
+  id        String   @id @default(cuid())
+  tenantId  String?  @map("tenant_id")
+  ticketId  String   @map("ticket_id")
+  tagId     String   @map("tag_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([ticketId, tagId])
+  @@map("ticket_tags")
+}
+
+/// Hierarchical ticket categories (Hardware → Laptop → Battery). Synced from config.
+model Category {
+  id        String   @id @default(cuid())
+  tenantId  String?  @map("tenant_id")
+  /// Slash-separated key path, e.g. "hardware/laptop/battery". Stable across syncs.
+  path      String   @unique
+  name      String
+  parentId  String?  @map("parent_id")
+  depth     Int      @default(0)
+  order     Int      @default(0)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children Category[] @relation("CategoryTree")
+  tickets  Ticket[]
+
+  @@index([parentId])
+  @@map("categories")
+}
+
+/// ticket↔ticket or ticket↔asset link.
+model Relationship {
+  id             String           @id @default(cuid())
+  tenantId       String?          @map("tenant_id")
+  type           RelationshipType
+  sourceTicketId String           @map("source_ticket_id")
+  targetTicketId String?          @map("target_ticket_id")
+  targetAssetId  String?          @map("target_asset_id")
+  createdById    String?          @map("created_by_id")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  sourceTicket Ticket  @relation("RelationshipSource", fields: [sourceTicketId], references: [id], onDelete: Cascade)
+  targetTicket Ticket? @relation("RelationshipTarget", fields: [targetTicketId], references: [id], onDelete: Cascade)
+  targetAsset  Asset?  @relation(fields: [targetAssetId], references: [id], onDelete: Cascade)
+
+  @@unique([type, sourceTicketId, targetTicketId])
+  @@unique([type, sourceTicketId, targetAssetId])
+  @@index([targetTicketId])
+  @@index([targetAssetId])
+  @@map("relationships")
+}
+
+model SavedView {
+  id        String   @id @default(cuid())
+  tenantId  String?  @map("tenant_id")
+  name      String
+  ownerId   String?  @map("owner_id")
+  teamId    String?  @map("team_id")
+  /// Shared views are visible to all agents.
+  isShared  Boolean  @default(false) @map("is_shared")
+  filters   Json
+  columns   Json?
+  sort      Json?
+  order     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  owner User? @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  team  Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@map("saved_views")
+}
+
+// ─── SLA ────────────────────────────────────────────────────────────────────
+
+/// Synced from config.
+model SLAPolicy {
+  id                String      @id @default(cuid())
+  tenantId          String?     @map("tenant_id")
+  key               String      @unique
+  name              String
+  priorities        String[]
+  ticketTypes       String[]    @map("ticket_types") /// empty = all types
+  firstResponseMins Int?        @map("first_response_mins")
+  resolutionMins    Int?        @map("resolution_mins")
+  calendar          SlaCalendar @default(BUSINESS_HOURS)
+  pauseStatuses     String[]    @map("pause_statuses")
+  warnAtPercent     Int         @default(80) @map("warn_at_percent")
+  order             Int         @default(0)
+  isActive          Boolean     @default(true) @map("is_active")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  instances SLAInstance[]
+
+  @@map("sla_policies")
+}
+
+/// One timer per ticket per metric.
+model SLAInstance {
+  id             String    @id @default(cuid())
+  tenantId       String?   @map("tenant_id")
+  ticketId       String    @map("ticket_id")
+  policyId       String    @map("policy_id")
+  metric         SlaMetric
+  status         SlaStatus @default(RUNNING)
+  targetMins     Int       @map("target_mins")
+  startedAt      DateTime  @map("started_at")
+  /// Recomputed whenever the timer resumes.
+  dueAt          DateTime  @map("due_at")
+  warnAt         DateTime? @map("warn_at")
+  pausedAt       DateTime? @map("paused_at")
+  /// Calendar minutes consumed before the current running segment.
+  elapsedMins    Int       @default(0) @map("elapsed_mins")
+  stoppedAt      DateTime? @map("stopped_at")
+  warnedAt       DateTime? @map("warned_at")
+  breachedAt     DateTime? @map("breached_at")
+  /// Set when a team lead overrides the due date.
+  overriddenById String?   @map("overridden_by_id")
+  overrideReason String?   @map("override_reason")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  ticket Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  policy SLAPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@unique([ticketId, metric])
+  @@index([status, dueAt])
+  @@index([status, warnAt])
+  @@map("sla_instances")
+}
+
+// ─── Knowledge base ────────────────────────────────────────────────────────
+
+model KbCategory {
+  id          String   @id @default(cuid())
+  tenantId    String?  @map("tenant_id")
+  slug        String   @unique
+  name        String
+  description String?
+  icon        String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  articles KnowledgeArticle[]
+
+  @@map("kb_categories")
+}
+
+model KnowledgeArticle {
+  id              String                   @id @default(cuid())
+  tenantId        String?                  @map("tenant_id")
+  slug            String                   @unique
+  title           String
+  body            String /// sanitized HTML
+  bodyText        String                   @default("") @map("body_text")
+  excerpt         String?
+  status          ArticleStatus            @default(DRAFT)
+  visibility      ArticleVisibility        @default(PUBLIC)
+  categoryId      String?                  @map("category_id")
+  authorId        String?                  @map("author_id")
+  tags            String[]
+  publishedAt     DateTime?                @map("published_at")
+  viewCount       Int                      @default(0) @map("view_count")
+  helpfulCount    Int                      @default(0) @map("helpful_count")
+  notHelpfulCount Int                      @default(0) @map("not_helpful_count")
+  searchVector    Unsupported("tsvector")? @map("search_vector")
+  deletedAt       DateTime?                @map("deleted_at")
+  createdAt       DateTime                 @default(now()) @map("created_at")
+  updatedAt       DateTime                 @updatedAt @map("updated_at")
+
+  category    KbCategory?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  author      User?             @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  feedback    ArticleFeedback[]
+  attachments Attachment[]
+
+  @@index([status, visibility])
+  @@index([searchVector], map: "knowledge_articles_search_vector_idx", type: Gin)
+  @@map("knowledge_articles")
+}
+
+model ArticleFeedback {
+  id        String   @id @default(cuid())
+  tenantId  String?  @map("tenant_id")
+  articleId String   @map("article_id")
+  userId    String?  @map("user_id")
+  helpful   Boolean
+  comment   String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  article KnowledgeArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user    User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([articleId])
+  @@map("article_feedback")
+}
+
+// ─── Service catalog & approvals ───────────────────────────────────────────
+
+model CatalogItem {
+  id               String   @id @default(cuid())
+  tenantId         String?  @map("tenant_id")
+  key              String   @unique
+  name             String
+  description      String?
+  icon             String?
+  group            String?
+  ticketTypeKey    String   @map("ticket_type_key")
+  teamId           String?  @map("team_id")
+  priority         String?
+  /// Form fields, same shape as ticket-type custom fields in config.
+  fields           Json
+  requiresApproval Boolean  @default(false) @map("requires_approval")
+  /// Users (by id) who can approve. Empty = anyone with catalog.approve.
+  approverIds      String[] @map("approver_ids")
+  isActive         Boolean  @default(true) @map("is_active")
+  order            Int      @default(0)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  team     Team?            @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  requests CatalogRequest[]
+
+  @@map("catalog_items")
+}
+
+model CatalogRequest {
+  id             String         @id @default(cuid())
+  tenantId       String?        @map("tenant_id")
+  itemId         String         @map("item_id")
+  ticketId       String         @unique @map("ticket_id")
+  requesterId    String         @map("requester_id")
+  formData       Json           @map("form_data")
+  approvalStatus ApprovalStatus @default(NOT_REQUIRED) @map("approval_status")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  item      CatalogItem @relation(fields: [itemId], references: [id])
+  ticket    Ticket      @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  requester User        @relation(fields: [requesterId], references: [id])
+  approvals Approval[]
+
+  @@map("catalog_requests")
+}
+
+/// An approval step for a catalog request or a change (CAB vote).
+model Approval {
+  id               String         @id @default(cuid())
+  tenantId         String?        @map("tenant_id")
+  kind             ApprovalKind
+  ticketId         String         @map("ticket_id")
+  catalogRequestId String?        @map("catalog_request_id")
+  approverId       String         @map("approver_id")
+  status           ApprovalStatus @default(PENDING)
+  comment          String?
+  decidedAt        DateTime?      @map("decided_at")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  ticket         Ticket          @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  catalogRequest CatalogRequest? @relation(fields: [catalogRequestId], references: [id], onDelete: Cascade)
+  approver       User            @relation(fields: [approverId], references: [id], onDelete: Cascade)
+
+  @@unique([ticketId, approverId, kind])
+  @@index([approverId, status])
+  @@map("approvals")
+}
+
+model CSATResponse {
+  id          String    @id @default(cuid())
+  tenantId    String?   @map("tenant_id")
+  ticketId    String    @unique @map("ticket_id")
+  requesterId String    @map("requester_id")
+  token       String    @unique
+  rating      Int?
+  comment     String?
+  sentAt      DateTime  @default(now()) @map("sent_at")
+  respondedAt DateTime? @map("responded_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  ticket    Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  requester User   @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+
+  @@index([respondedAt])
+  @@map("csat_responses")
+}
+
+// ─── Assets (lightweight CMDB) ─────────────────────────────────────────────
+
+model Asset {
+  id                String    @id @default(cuid())
+  tenantId          String?   @map("tenant_id")
+  tag               String    @unique /// human-readable asset tag
+  name              String
+  assetType         String    @map("asset_type")
+  status            String    @default("in_use")
+  serialNumber      String?   @map("serial_number")
+  manufacturer      String?
+  model             String?
+  location          String?
+  ownerId           String?   @map("owner_id")
+  organizationId    String?   @map("organization_id")
+  purchaseDate      DateTime? @map("purchase_date")
+  warrantyExpiresAt DateTime? @map("warranty_expires_at")
+  attributes        Json?
+  notes             String?
+  deletedAt         DateTime? @map("deleted_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  owner         User?          @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  organization  Organization?  @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  relationships Relationship[]
+
+  @@index([tenantId])
+  @@index([ownerId])
+  @@index([organizationId])
+  @@map("assets")
+}
+
+// ─── Automation & integrations ─────────────────────────────────────────────
+
+model Automation {
+  id             String    @id @default(cuid())
+  tenantId       String?   @map("tenant_id")
+  name           String
+  description    String?
+  isActive       Boolean   @default(true) @map("is_active")
+  /// ticket.created | ticket.updated | ticket.status_changed | sla.warning | sla.breached | schedule
+  trigger        String
+  /// For "schedule" triggers: cron expression.
+  schedule       String?
+  conditions     Json
+  actions        Json
+  order          Int       @default(0)
+  /// Stop evaluating later automations after this one matches.
+  stopProcessing Boolean   @default(false) @map("stop_processing")
+  runCount       Int       @default(0) @map("run_count")
+  lastRunAt      DateTime? @map("last_run_at")
+  createdById    String?   @map("created_by_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  createdBy User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  runs      AutomationRun[]
+
+  @@index([trigger, isActive])
+  @@map("automations")
+}
+
+model AutomationRun {
+  id           String   @id @default(cuid())
+  tenantId     String?  @map("tenant_id")
+  automationId String   @map("automation_id")
+  ticketId     String?  @map("ticket_id")
+  event        String
+  matched      Boolean
+  success      Boolean  @default(true)
+  error        String?
+  actionsRun   Json?    @map("actions_run")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  automation Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  ticket     Ticket?    @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+
+  @@index([automationId, createdAt])
+  @@map("automation_runs")
+}
+
+model Webhook {
+  id             String    @id @default(cuid())
+  tenantId       String?   @map("tenant_id")
+  name           String
+  url            String
+  secret         String
+  events         String[]
+  isActive       Boolean   @default(true) @map("is_active")
+  lastDeliveryAt DateTime? @map("last_delivery_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  deliveries WebhookDelivery[]
+
+  @@map("webhooks")
+}
+
+model WebhookDelivery {
+  id             String         @id @default(cuid())
+  tenantId       String?        @map("tenant_id")
+  webhookId      String         @map("webhook_id")
+  event          String
+  payload        Json
+  status         DeliveryStatus @default(PENDING)
+  attempts       Int            @default(0)
+  responseStatus Int?           @map("response_status")
+  responseBody   String?        @map("response_body")
+  error          String?
+  nextAttemptAt  DateTime?      @map("next_attempt_at")
+  deliveredAt    DateTime?      @map("delivered_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId, createdAt])
+  @@map("webhook_deliveries")
+}
+
+/// Canned responses and macros (a canned reply plus optional field changes).
+model CannedResponse {
+  id        String   @id @default(cuid())
+  tenantId  String?  @map("tenant_id")
+  name      String
+  body      String
+  /// Optional macro actions, e.g. [{type:"set_status", value:"resolved"}].
+  actions   Json?
+  ownerId   String?  @map("owner_id")
+  teamId    String?  @map("team_id")
+  isShared  Boolean  @default(true) @map("is_shared")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  owner User? @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  team  Team? @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  @@map("canned_responses")
+}
+
+// ─── Platform ──────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String    @id @default(cuid())
+  tenantId   String?   @map("tenant_id")
+  actorType  ActorType @map("actor_type")
+  actorId    String?   @map("actor_id")
+  actorLabel String?   @map("actor_label")
+  action     String
+  entityType String    @map("entity_type")
+  entityId   String?   @map("entity_id")
+  changes    Json?
+  ip         String?
+  userAgent  String?   @map("user_agent")
+  requestId  String?   @map("request_id")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  tenantId  String?   @map("tenant_id")
+  userId    String    @map("user_id")
+  type      String
+  title     String
+  body      String?
+  link      String?
+  ticketId  String?   @map("ticket_id")
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ticket Ticket? @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+/// Log of inbound emails, used for de-duplication and troubleshooting.
+model InboundEmail {
+  id        String             @id @default(cuid())
+  tenantId  String?            @map("tenant_id")
+  messageId String             @unique @map("message_id")
+  mailbox   String
+  fromEmail String             @map("from_email")
+  subject   String
+  status    InboundEmailStatus @default(RECEIVED)
+  ticketId  String?            @map("ticket_id")
+  error     String?
+  createdAt DateTime           @default(now()) @map("created_at")
+  updatedAt DateTime           @updatedAt @map("updated_at")
+
+  ticket Ticket? @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+
+  @@map("inbound_emails")
+}
+
+enum OutboundEmailStatus {
+  QUEUED
+  SENT
+  FAILED
+  SKIPPED
+}
+
+/// Every email we send. Message-IDs are used to thread replies back to tickets.
+model OutboundEmail {
+  id        String              @id @default(cuid())
+  tenantId  String?             @map("tenant_id")
+  ticketId  String?             @map("ticket_id")
+  /// Why this email was sent, e.g. "ticket.reply", "ticket.created.ack", "sla.breached".
+  kind      String
+  toAddress String              @map("to_address")
+  ccAddress String[]            @map("cc_address")
+  subject   String
+  messageId String              @unique @map("message_id")
+  inReplyTo String?             @map("in_reply_to")
+  html      String
+  text      String
+  status    OutboundEmailStatus @default(QUEUED)
+  attempts  Int                 @default(0)
+  error     String?
+  sentAt    DateTime?           @map("sent_at")
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
+
+  ticket Ticket? @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId])
+  @@index([status, createdAt])
+  @@map("outbound_emails")
+}
+
+/// One-time password reset (and invite) tokens. Only a hash is stored.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tenantId  String?   @map("tenant_id")
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  /// "reset" or "invite"
+  purpose   String    @default("reset")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+/// Key/value store for small runtime state (e.g. IMAP last-seen UIDs).
+model SystemSetting {
+  id        String   @id @default(cuid())
+  tenantId  String?  @map("tenant_id")
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
