@@ -38,6 +38,12 @@ export const CATEGORY_MAP: Record<string, StatusCategory> = {
 
 const OPEN_CATEGORIES: StatusCategory[] = [StatusCategory.NEW, StatusCategory.OPEN, StatusCategory.PENDING];
 
+/** Problem and change tickets need their module permission to create, edit or move. */
+function assertModulePermission(actor: Actor, typeCfg: TicketTypeConfig) {
+  if (typeCfg.feature === "problemManagement") assertCan(actor, "problem.manage");
+  if (typeCfg.feature === "changeManagement") assertCan(actor, "change.manage");
+}
+
 function typeConfigOrThrow(cfg: BusinessConfig, key: string): TicketTypeConfig {
   const t = getTicketTypeConfig(cfg, key);
   if (!t) throw new ValidationError(`Ticket type "${key}" is not configured`);
@@ -155,6 +161,8 @@ export const createTicketSchema = z.object({
   watcherIds: z.array(z.string().max(64)).max(50).default([]),
   ccEmails: z.array(z.email()).max(20).default([]),
   attachmentIds: z.array(z.string().max(64)).max(20).default([]),
+  /** Affected assets. Requesters may only pick assets assigned to them. */
+  assetIds: z.array(z.string().max(64)).max(10).default([]),
   dueAt: z.iso.datetime().nullable().optional(),
 });
 export type CreateTicketInput = z.input<typeof createTicketSchema>;
@@ -178,6 +186,7 @@ export async function createTicket(actor: Actor, rawInput: CreateTicketInput, op
   const typeCfg = activeTicketTypes(cfg).find((t) => t.key === input.type);
   if (!typeCfg) throw new ValidationError(`Unknown ticket type "${input.type}"`, { type: "unknown" });
   if (!staff && !typeCfg.portalVisible) throw new ForbiddenError(undefined, `${typeCfg.name} tickets can't be created from the portal`);
+  assertModulePermission(actor, typeCfg);
 
   // Staff-only inputs
   const staffOnly = { teamId: input.teamId, assigneeId: input.assigneeId, priority: input.priority, dueAt: input.dueAt };
@@ -214,6 +223,14 @@ export async function createTicket(actor: Actor, rawInput: CreateTicketInput, op
   if (input.assigneeId) await validateUserIds(db as unknown as Tx, [input.assigneeId]);
   if (input.categoryId && !(await db.category.findFirst({ where: { id: input.categoryId, isActive: true } }))) {
     throw new ValidationError("Unknown category", { categoryId: "unknown" });
+  }
+
+  // Asset-type custom fields link the asset too, with the same ownership rule.
+  const fieldAssetIds = typeCfg.fields.filter((f) => f.type === "asset").map((f) => fieldValues[f.key]).filter((v): v is string => typeof v === "string" && v !== "");
+  const assetIds = [...new Set([...input.assetIds, ...fieldAssetIds])];
+  if (assetIds.length) {
+    const ok = await db.asset.findMany({ where: { id: { in: assetIds }, deletedAt: null, ...(staff ? {} : { ownerId: requester.id }) }, select: { id: true } });
+    if (ok.length !== assetIds.length) throw new ValidationError("Unknown asset", { assetIds: "unknown" });
   }
 
   const priority =
@@ -272,6 +289,9 @@ export async function createTicket(actor: Actor, rawInput: CreateTicketInput, op
         where: { id: { in: input.attachmentIds }, ticketId: null, commentId: null, uploaderId: uid ?? undefined },
         data: { ticketId: created.id },
       });
+    }
+    if (assetIds.length) {
+      await tx.relationship.createMany({ data: assetIds.map((targetAssetId) => ({ type: RelationshipType.AFFECTS_ASSET, sourceTicketId: created.id, targetAssetId, createdById: uid })) });
     }
     return created;
   });
@@ -511,6 +531,10 @@ export async function updateTicket(actor: Actor, id: string, rawInput: UpdateTic
   const cfg = getConfig();
   const ticket = await getTicket(actor, id);
   const typeCfg = typeConfigOrThrow(cfg, ticket.type.key);
+  assertModulePermission(actor, typeCfg);
+  if (input.riskLevel !== undefined && input.riskLevel !== ticket.riskLevel && ticket.cabStatus === "PENDING") {
+    throw new ValidationError("The risk level can't change while the CAB is reviewing this change");
+  }
 
   assertKnown(cfg.priorities.levels, input.priority, "priority");
   assertKnown(cfg.priorities.impact, input.impact, "impact");
@@ -563,6 +587,17 @@ export async function updateTicket(actor: Actor, id: string, rawInput: UpdateTic
         if (JSON.stringify(before[k] ?? null) !== JSON.stringify(v ?? null)) changes[`field.${k}`] = { from: before[k] ?? null, to: v };
       }
       await writeFieldValues(tx, ticket.id, ticket.typeId, typeCfg.fields, fieldValues);
+      // Newly chosen assets in asset fields get linked (old links stay as history).
+      for (const f of typeCfg.fields.filter((x) => x.type === "asset")) {
+        const assetId = fieldValues[f.key];
+        if (typeof assetId !== "string" || !assetId || assetId === before[f.key]) continue;
+        if (!(await tx.asset.findFirst({ where: { id: assetId, deletedAt: null } }))) throw new ValidationError("Unknown asset", { [f.key]: "unknown" });
+        await tx.relationship.upsert({
+          where: { type_sourceTicketId_targetAssetId: { type: RelationshipType.AFFECTS_ASSET, sourceTicketId: ticket.id, targetAssetId: assetId } },
+          create: { type: RelationshipType.AFFECTS_ASSET, sourceTicketId: ticket.id, targetAssetId: assetId, createdById: actorUserId(actor) },
+          update: {},
+        });
+      }
     }
     if (input.tags) {
       const beforeTags = ticket.tags.map((t) => t.tag.name).sort();
@@ -650,8 +685,10 @@ export async function transitionTicket(actor: Actor, id: string, input: z.infer<
   const isRequester = uid === ticket.requesterId;
   if (actor.kind !== "system" && !can(actor, "ticket.transition") && !isRequester) throw new ForbiddenError("ticket.transition");
   const typeCfg = typeConfigOrThrow(cfg, ticket.type.key);
+  if (!isRequester) assertModulePermission(actor, typeCfg);
   const commentText = input.comment ? richText(input.comment) : null;
   const rule = resolveTransition(typeCfg, ticket.status, input.to, workflowActorFor(actor, ticket), commentText?.text);
+  if (typeCfg.feature === "changeManagement") await (await import("./changes")).assertChangeTransition(actor, ticket, rule.to);
   const target = stateOf(typeCfg, rule.to)!;
   const category = CATEGORY_MAP[target.category]!;
   const now = new Date();

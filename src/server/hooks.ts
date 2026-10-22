@@ -4,3 +4,5 @@
  */
 import "./sla";
 import "./services/csat";
+import "./services/changes";
+import "./services/problems";

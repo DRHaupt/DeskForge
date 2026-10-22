@@ -16,6 +16,9 @@ import { createUserSchema, organizationSchema, roleSchema, teamMembersSchema, te
 import { assignSchema, bulkSchema, commentSchema, createTicketSchema, linkSchema, ticketFilterSchema, transitionSchema, updateTicketSchema, watchersSchema } from "./services/tickets";
 import { viewSchema } from "./services/views";
 import { webhookSchema } from "./webhooks";
+import { assetFilterSchema, assetInputSchema, importSchema } from "./services/assets";
+import { boardFilterSchema, moveSchema } from "./services/boards";
+import { knownErrorFilter, raiseProblemSchema } from "./services/problems";
 import { markReadSchema } from "./services/notifications";
 import { csatAnswerSchema } from "./services/csat";
 
@@ -51,6 +54,19 @@ export const ENDPOINTS: Endpoint[] = [
   { method: "post", path: "/tickets/{id}/macro", tag: "Tickets", summary: "Apply a macro's actions", permission: "ticket.update", body: z.object({ cannedId: z.string() }) },
   { method: "post", path: "/tickets/bulk", tag: "Tickets", summary: "Bulk update (per-ticket results)", permission: "ticket.bulk", body: bulkSchema },
   { method: "delete", path: "/comments/{id}", tag: "Tickets", summary: "Delete your comment", permission: "signed-in" },
+  { method: "post", path: "/tickets/{id}/problem", tag: "ITSM", summary: "Raise a problem from this incident and link them", permission: "problem.manage", body: raiseProblemSchema, status: 201 },
+  { method: "get", path: "/known-errors", tag: "ITSM", summary: "Known errors with workarounds", permission: "ticket.comment_internal", query: knownErrorFilter },
+  { method: "get", path: "/assets", tag: "ITSM", summary: "List and filter assets", permission: "asset.view", query: assetFilterSchema },
+  { method: "post", path: "/assets", tag: "ITSM", summary: "Create an asset", permission: "asset.manage", body: assetInputSchema, status: 201 },
+  { method: "get", path: "/assets/{id}", tag: "ITSM", summary: "Get an asset (by id or tag) with linked tickets", permission: "asset.view" },
+  { method: "patch", path: "/assets/{id}", tag: "ITSM", summary: "Update an asset", permission: "asset.manage", body: assetInputSchema.partial() },
+  { method: "delete", path: "/assets/{id}", tag: "ITSM", summary: "Delete (soft) an asset", permission: "asset.manage" },
+  { method: "post", path: "/assets/import", tag: "ITSM", summary: "Import or update assets from CSV text (matched by tag); dryRun previews", permission: "asset.manage", body: importSchema },
+  { method: "get", path: "/assets/export", tag: "ITSM", summary: "Export assets as CSV", permission: "asset.view", query: assetFilterSchema.partial() },
+  { method: "get", path: "/boards", tag: "ITSM", summary: "Agile boards defined in the business config", permission: ["ticket.view_team", "ticket.view_all"] },
+  { method: "get", path: "/boards/{key}", tag: "ITSM", summary: "Board columns and cards", permission: ["ticket.view_team", "ticket.view_all"], query: boardFilterSchema },
+  { method: "post", path: "/boards/{key}/move", tag: "ITSM", summary: "Move a card (transitions the ticket if the column changes)", permission: "ticket.update", body: moveSchema },
+  { method: "get", path: "/me/assets", tag: "Me", summary: "Assets assigned to you", permission: "signed-in" },
   { method: "post", path: "/attachments", tag: "Attachments", summary: "Upload a file (multipart/form-data, field 'file'); reference the returned id when posting", permission: ["ticket.create", "ticket.reply", "ticket.comment_internal", "kb.author"], status: 201 },
   { method: "get", path: "/attachments/{id}", tag: "Attachments", summary: "Download an attachment you can see", permission: "signed-in" },
   { method: "get", path: "/search", tag: "Tickets", summary: "Full-text search across tickets, comments and articles", permission: "signed-in", query: z.object({ q: z.string(), kind: z.enum(["all", "tickets", "articles"]).optional(), limit: z.number().optional() }) },
