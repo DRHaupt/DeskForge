@@ -22,3 +22,4 @@ dump.rdb
 .next-e2e/
 test-results/
 playwright-report/
+.next-build/

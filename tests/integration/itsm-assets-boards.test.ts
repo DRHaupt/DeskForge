@@ -133,3 +133,18 @@ describe("agile board", () => {
     await expect(moveCard(agent, "it_projects", { ticketId: a, column: 9 })).rejects.toBeInstanceOf(ValidationError);
   });
 });
+
+describe("ITSM API routes", () => {
+  it("serve boards and my assets over HTTP", async () => {
+    const { GET: boardsRoute } = await import("@/app/api/v1/boards/route");
+    const { GET: boardRoute } = await import("@/app/api/v1/boards/[key]/route");
+    const { GET: myAssetsRoute } = await import("@/app/api/v1/me/assets/route");
+    const agentKey = await apiKeyFor(agent.id);
+    expect(await (await boardsRoute(req("/api/v1/boards", { key: agentKey }), params())).json()).toEqual([expect.objectContaining({ key: "it_projects" })]);
+    const board = await (await boardRoute(req("/api/v1/boards/it_projects", { key: agentKey }), params({ key: "it_projects" }))).json();
+    expect(board.columns).toHaveLength(5);
+    expect((await boardsRoute(req("/api/v1/boards", { key: memberKey }), params())).status).toBe(403);
+    const mine = await (await myAssetsRoute(req("/api/v1/me/assets", { key: memberKey }), params())).json();
+    expect(mine.map((a: { tag: string }) => a.tag)).toContain("LT-001");
+  });
+});
