@@ -481,3 +481,62 @@ touch `updatedAt`, so reordering doesn't affect SLAs, sorting or automations.
 WIP limits are shown but not enforced. Finished cards drop off after 30 days.
 Every card also has a "Move to" menu as a keyboard-accessible alternative to
 drag and drop.
+
+## Phase 7 — Reporting & hardening
+
+### D-056 · Report definitions
+- Periods are the last 7, 30 or 90 **local** days (today included), in
+  `locale.timezone`.
+- Response and resolution times are wall-clock time from creation to the first
+  public agent reply, or to the first move into a resolved state. Business-hours
+  SLAs are measured separately by SLA compliance. Medians and 90th percentiles
+  are shown, not averages, because a few very old tickets would skew averages.
+- SLA compliance counts timers that finished (met) or breached within the
+  period: met ÷ (met + breached). Cancelled timers are ignored.
+- Merged and deleted tickets are excluded everywhere. `report.view` covers the
+  whole help desk; reports aren't narrowed by the viewer's teams, but can be
+  filtered by team and type.
+- CSV exports need `report.export` and are capped at 100,000 rows.
+
+### D-057 · Charts
+Charts are hand-written SVG instead of a charting library, to keep the bundle
+small and strict-CSP friendly. They use one y-axis and 2px lines, have a
+crosshair tooltip that also works from the keyboard, a legend and end labels,
+and a "show as table" view. The two series colors (`--series-1/2`) passed a
+colorblind-safety and contrast check against the app's light and dark card
+colors. SLA status uses an icon plus a label, never color alone.
+
+### D-058 · Two-factor authentication
+TOTP (RFC 6238, SHA-1, 6 digits, 30 s, ±1 step). Secrets are encrypted with
+AES-256-GCM using a key derived from `AUTH_SECRET`, and only turned on after
+the user enters a valid code. Roles in `auth.requireTwoFactorForRoles` must
+enrol: until they do, pages redirect to the setup page and the API answers
+403 (except the setup and profile endpoints). This applies only to accounts
+with a password; SSO-only users rely on their identity provider's MFA.
+Required users can't turn 2FA off; an admin can reset it.
+Known limitation: a code can be reused within its 30-second window. Rate limits
+and the lockout make that hard to exploit.
+
+### D-059 · Sign-in protection
+Password sign-in is rate-limited to 20 attempts per minute per IP and 10 per
+account. This is on top of the per-account lockout (`maxFailedAttempts`).
+Wrong 2FA codes count towards the lockout too. A missing or malformed code
+means "ask for a code", never "wrong code".
+
+### D-060 · Dependency hygiene
+`npm audit --omit=dev` is kept at zero. nodemailer is pinned to v10 through
+`overrides`, including the copy next-auth depends on (DeskForge doesn't use
+next-auth's email provider).
+
+### D-061 · End-to-end test environment
+Playwright starts a self-contained stack (`scripts/e2e-server.sh`): a
+dedicated `*_e2e` database (the reset script refuses any other name), Redis DB
+1, the real worker with a 3-second SLA sweep, and a dev server with its own
+build folder. Tests check side effects in the database where the UI doesn't
+show them (emails sent, automation runs). Email is sent through the logging
+transport, so nothing leaves the machine.
+
+### D-062 · Relative times
+"N seconds ago" made the server and browser render different text (a hydration
+mismatch). Relative times now read "just now" under a minute, and are rendered
+in a `<time>` element with the exact timestamp on hover.

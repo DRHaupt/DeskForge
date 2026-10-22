@@ -66,7 +66,7 @@ export default async function PortalHome() {
                     <BookOpen className="size-4 text-primary" aria-hidden /> {c.name}
                   </span>
                   {c.description && <span className="mt-1 block text-sm text-muted-foreground">{c.description}</span>}
-                  <span className="mt-2 block text-xs text-muted-foreground">{c._count.articles} articles</span>
+                  <span className="mt-2 block text-xs text-muted-foreground">{c._count.articles} {c._count.articles === 1 ? "article" : "articles"}</span>
                 </Link>
               ))}
             </div>
