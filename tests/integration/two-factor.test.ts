@@ -106,3 +106,17 @@ describe("password sign-in protection", () => {
     if (firstLimited === 10) expect(codes.slice(10)).toEqual(["rate_limited", "rate_limited"]);
   });
 });
+
+describe("sign-in with 2FA enabled", () => {
+  it("asks for a code when none (or junk) is sent, without counting a failure", async () => {
+    const { _authorizeCredentialsForTests } = await import("@/server/auth");
+    const u = await makeUser(`junk-otp-${Date.now()}@northbeam-it.example`, ["agent"]);
+    const a = await actorFor(u.id);
+    const { secret } = await beginEnrollment(a);
+    await confirmEnrollment(a, { code: totpCode(secret) });
+    const attempt = (otp?: string) => _authorizeCredentialsForTests({ email: u.email, password: "Test-Password-123!", otp }, new Request("http://localhost/x", { headers: { "x-forwarded-for": `192.0.2.${Math.floor(Math.random() * 200)}` } }));
+    await expect(attempt("undefined")).rejects.toMatchObject({ code: "otp_required" });
+    await expect(attempt("")).rejects.toMatchObject({ code: "otp_required" });
+    expect((await db.user.findUniqueOrThrow({ where: { id: u.id } })).failedLoginCount).toBe(0);
+  });
+});

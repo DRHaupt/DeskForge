@@ -11,10 +11,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { timeAgo } from "@/lib/format";
+
 import { requirePagePermission } from "@/server/session";
 import { articleListSchema, listArticles, listKbCategories } from "@/server/services/kb";
 import { CategoryManager } from "./category-manager";
+import { RelativeTime } from "@/components/relative-time";
 
 export const metadata: Metadata = { title: "Knowledge base" };
 
@@ -96,7 +97,7 @@ export default async function AgentKb({ searchParams }: { searchParams: Promise<
                     <TableCell className="hidden text-sm md:table-cell">
                       {a.helpfulCount + a.notHelpfulCount ? `${Math.round((a.helpfulCount / (a.helpfulCount + a.notHelpfulCount)) * 100)}%` : "—"}
                     </TableCell>
-                    <TableCell className="hidden text-sm text-muted-foreground sm:table-cell">{timeAgo(a.updatedAt)}</TableCell>
+                    <TableCell className="hidden text-sm text-muted-foreground sm:table-cell"><RelativeTime date={a.updatedAt} /></TableCell>
                   </TableRow>
                 ))}
                 {result.items.length === 0 && (

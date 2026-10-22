@@ -13,6 +13,7 @@ export type TicketMeta = {
     key: string;
     name: string;
     description?: string;
+    icon?: string;
     portalVisible: boolean;
     /** Module the type belongs to (problem/change management), if any. */
     feature?: "problemManagement" | "changeManagement";
@@ -33,6 +34,7 @@ export function buildTicketMeta(cfg: BusinessConfig): TicketMeta {
       key: t.key,
       name: t.name,
       description: t.description,
+      icon: t.icon,
       portalVisible: t.portalVisible,
       feature: t.feature,
       fields: t.fields,

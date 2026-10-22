@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/sonner";
 import { FieldInputs } from "@/components/tickets/field-inputs";
+import { ItemIcon } from "@/components/item-icon";
 import { RichTextEditor } from "@/components/tickets/rich-text-editor";
 import { AttachmentUploader, type Uploaded } from "@/components/tickets/attachment-uploader";
 import { api, ApiClientError } from "@/lib/api-client";
@@ -93,7 +94,10 @@ export function PortalNewForm({ types, initialType, impact, urgency, suggest, as
             {types.map((t) => (
               <label key={t.key} className={cn("cursor-pointer rounded-lg border p-3 hover:bg-accent/40", typeKey === t.key && "border-primary bg-primary/5 ring-1 ring-primary")}>
                 <input type="radio" name="type" value={t.key} checked={typeKey === t.key} onChange={() => { setTypeKey(t.key); setFields({}); }} className="sr-only" />
-                <span className="block font-medium">{t.name}</span>
+                <span className="flex items-center gap-2 font-medium">
+                  {t.icon && <ItemIcon name={t.icon} className="size-4 text-primary" />}
+                  {t.name}
+                </span>
                 {t.description && <span className="text-sm text-muted-foreground">{t.description}</span>}
               </label>
             ))}

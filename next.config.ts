@@ -13,6 +13,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Lets a second dev server (e.g. the Playwright suite) run beside the normal one.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   // Packages that must stay as Node requires (native bits / dynamic requires).
   serverExternalPackages: ["pino", "pino-pretty", "bullmq", "ioredis", "pg", "@prisma/adapter-pg", "imapflow", "mailparser", "nodemailer", "sanitize-html"],
   experimental: {

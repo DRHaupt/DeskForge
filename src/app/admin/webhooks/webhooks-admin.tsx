@@ -12,7 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/sonner";
 import { api } from "@/lib/api-client";
-import { timeAgo } from "@/lib/format";
+import { RelativeTime } from "@/components/relative-time";
+
 
 type Delivery = { id: string; event: string; status: string; attempts: number; responseStatus: number | null; error: string | null; createdAt: string };
 type Hook = { id: string; name: string; url: string; events: string[]; isActive: boolean; secretPreview: string; lastDeliveryAt: string | null; deliveries: Delivery[] };
@@ -80,7 +81,7 @@ export function WebhooksAdmin({ hooks, events }: { hooks: Hook[]; events: string
                     <Badge variant={d.status === "SUCCEEDED" ? "secondary" : d.status === "FAILED" ? "destructive" : "outline"}>{d.status.toLowerCase()}</Badge>
                     <span className="font-mono text-xs">{d.event}</span>
                     <span className="text-xs text-muted-foreground">
-                      {timeAgo(d.createdAt)} · {d.attempts} attempt(s){d.responseStatus ? ` · HTTP ${d.responseStatus}` : ""}
+                      <RelativeTime date={d.createdAt} /> · {d.attempts} attempt(s){d.responseStatus ? ` · HTTP ${d.responseStatus}` : ""}
                       {d.error && ` · ${d.error}`}
                     </span>
                     {d.status !== "SUCCEEDED" && (

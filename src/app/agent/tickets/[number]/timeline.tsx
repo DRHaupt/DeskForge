@@ -3,10 +3,11 @@
 import { Lock, ArrowRight, Mail, Paperclip, Activity } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { formatBytes } from "@/components/tickets/attachment-uploader";
-import { formatDateTime, timeAgo } from "@/lib/format";
+import { formatDateTime } from "@/lib/format";
 import { stateLabel, type TicketMeta } from "@/lib/ticket-meta";
 import { cn } from "@/lib/utils";
 import type { TimelineEntry } from "./types";
+import { RelativeTime } from "@/components/relative-time";
 
 const ACTIVITY: Record<string, string> = {
   "ticket.update": "updated",
@@ -60,7 +61,7 @@ export function Timeline({ items, meta, typeKey }: { items: TimelineEntry[]; met
                   </span>
                 )}
                 <time className="ml-auto text-xs text-muted-foreground" dateTime={i.at} title={formatDateTime(i.at, meta.timezone)}>
-                  {timeAgo(i.at)}
+                  <RelativeTime date={i.at} />
                 </time>
               </div>
               <div className="prose-df px-4 py-3" dangerouslySetInnerHTML={{ __html: i.body }} />
@@ -94,7 +95,7 @@ export function Timeline({ items, meta, typeKey }: { items: TimelineEntry[]; met
                 {i.reason && i.reason !== "created" && <> ({i.reason})</>}
               </span>
               <time className="ml-auto" dateTime={i.at} title={formatDateTime(i.at, meta.timezone)}>
-                {timeAgo(i.at)}
+                <RelativeTime date={i.at} />
               </time>
             </li>
           );
@@ -106,7 +107,7 @@ export function Timeline({ items, meta, typeKey }: { items: TimelineEntry[]; met
               {i.by?.replace(/^system:/, "Automation: ") ?? "System"} {ACTIVITY[i.action] ?? i.action} <span className="text-foreground">{describeChanges(i.action, i.changes)}</span>
             </span>
             <time className="ml-auto" dateTime={i.at} title={formatDateTime(i.at, meta.timezone)}>
-              {timeAgo(i.at)}
+              <RelativeTime date={i.at} />
             </time>
           </li>
         );

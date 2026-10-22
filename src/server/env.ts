@@ -10,6 +10,8 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().default("redis://localhost:6379"),
+  /** How often the worker checks SLA timers. Lower it only for tests. */
+  SLA_SWEEP_SECONDS: z.coerce.number().int().min(1).max(3600).default(60),
   APP_BASE_URL: z.url().default("http://localhost:3000"),
   AUTH_SECRET: z.string().min(32, "AUTH_SECRET must be at least 32 characters (generate with: openssl rand -base64 48)"),
   BUSINESS_CONFIG_PATH: z.string().default("./business.config.yaml"),

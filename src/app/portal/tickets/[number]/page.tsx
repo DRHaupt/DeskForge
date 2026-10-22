@@ -133,7 +133,7 @@ export default async function PortalTicket({ params }: { params: Promise<{ numbe
         )}
       </ol>
 
-      {!ticket.mergedInto && <PortalReply ticketId={ticket.id} canReply={actor.permissions.has("ticket.reply")} done={done} transitions={transitions.map((t) => ({ to: t.to, name: t.name, category: t.category, requireComment: t.requireComment }))} reopenOnReply={cfg.portal.reopenOnReply} allowClose={cfg.portal.allowRequesterClose} />}
+      {!ticket.mergedInto && <PortalReply ticketId={ticket.id} canReply={actor.permissions.has("ticket.reply")} done={done} transitions={transitions.map((t) => ({ to: t.to, name: t.name, category: t.category, requireComment: t.requireComment }))} reopenOnReply={cfg.portal.reopenOnReply} allowClose={cfg.portal.allowRequesterClose} closeStatus={cfg.portal.requesterCloseStatus} />}
     </div>
   );
 }

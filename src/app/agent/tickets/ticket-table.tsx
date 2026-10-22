@@ -10,9 +10,10 @@ import { toast } from "@/components/ui/sonner";
 import { PriorityBadge, StatusBadge } from "@/components/tickets/badges";
 import { SlaBadge } from "@/components/tickets/sla-badge";
 import { api } from "@/lib/api-client";
-import { timeAgo } from "@/lib/format";
+
 import { stateColor, stateLabel, type TicketMeta } from "@/lib/ticket-meta";
 import { cn } from "@/lib/utils";
+import { RelativeTime } from "@/components/relative-time";
 
 export type Row = {
   id: string;
@@ -202,7 +203,7 @@ export function TicketTable({ items, meta, canBulk, teams, agents }: { items: Ro
                       <SlaBadge sla={t.sla} compact />
                     </td>
                     <td className="hidden px-2 py-2 whitespace-nowrap text-muted-foreground sm:table-cell" title={new Date(t.updatedAt).toLocaleString()}>
-                      {timeAgo(t.updatedAt)}
+                      <RelativeTime date={t.updatedAt} />
                     </td>
                   </tr>
                 );

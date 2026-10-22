@@ -19,3 +19,6 @@ playwright-report/
 # Per-deployment config (copy one from examples/)
 /business.config.yaml
 dump.rdb
+.next-e2e/
+test-results/
+playwright-report/

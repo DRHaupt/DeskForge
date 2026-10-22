@@ -13,7 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/components/ui/sonner";
 import { api } from "@/lib/api-client";
-import { timeAgo } from "@/lib/format";
+import { RelativeTime } from "@/components/relative-time";
+
 
 type Key = { id: string; name: string; prefix: string; permissions: string[]; lastUsedAt: string | null; expiresAt: string | null; revokedAt: string | null; createdAt: string; createdBy: { name: string } | null };
 
@@ -66,13 +67,13 @@ export function ApiKeysAdmin({ keys, grantable }: { keys: Key[]; grantable: { ke
                 <TableCell>
                   <span className="font-medium">{k.name}</span> {k.revokedAt && <Badge variant="outline">Revoked</Badge>}
                   <div className="text-xs text-muted-foreground">
-                    by {k.createdBy?.name ?? "—"} · {timeAgo(k.createdAt)}
+                    by {k.createdBy?.name ?? "—"} · <RelativeTime date={k.createdAt} />
                     {k.expiresAt && ` · expires ${new Date(k.expiresAt).toLocaleDateString()}`}
                   </div>
                 </TableCell>
                 <TableCell className="font-mono text-xs">dfk_{k.prefix}_…</TableCell>
                 <TableCell className="max-w-xs text-xs">{k.permissions.includes("*") ? "All (capped by creator)" : k.permissions.join(", ")}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{k.lastUsedAt ? timeAgo(k.lastUsedAt) : "never"}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{k.lastUsedAt ? <RelativeTime date={k.lastUsedAt} /> : "never"}</TableCell>
                 <TableCell className="text-right">
                   {!k.revokedAt && (
                     <Button

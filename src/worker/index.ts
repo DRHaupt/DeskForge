@@ -63,7 +63,7 @@ async function main() {
 /** Repeating job ids → interval in ms. Extended as modules are added. */
 function repeatingJobs(): Record<string, number> {
   return {
-    "sla-sweep": 60_000,
+    "sla-sweep": getEnv().SLA_SWEEP_SECONDS * 1000,
     // Each mailbox has its own pollSeconds; this tick just checks which are due.
     "imap-poll": 15_000,
     // Scheduled automations each have their own interval; this tick checks which are due.

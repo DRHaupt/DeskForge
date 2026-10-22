@@ -4,11 +4,12 @@ import { getConfig } from "@/core/config/loader";
 import { PageHeader } from "@/components/console/console-shell";
 import { StatusBadge } from "@/components/tickets/badges";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { timeAgo } from "@/lib/format";
+
 import { buildTicketMeta, stateColor, stateLabel } from "@/lib/ticket-meta";
 import { db } from "@/server/db";
 import { requireAgent } from "@/server/session";
 import { filterWhere, listTickets, ticketFilterSchema } from "@/server/services/tickets";
+import { RelativeTime } from "@/components/relative-time";
 
 export const metadata: Metadata = { title: "Home" };
 
@@ -61,7 +62,7 @@ export default async function AgentHome() {
                   {t.title}
                 </Link>
                 <StatusBadge label={stateLabel(meta, t.type.key, t.status)} color={stateColor(meta, t.type.key, t.status)} category={t.statusCategory} />
-                <span className="w-24 text-right text-xs text-muted-foreground">{timeAgo(t.updatedAt)}</span>
+                <span className="w-24 text-right text-xs text-muted-foreground"><RelativeTime date={t.updatedAt} /></span>
               </li>
             ))}
             {recent.items.length === 0 && <li className="py-6 text-center text-sm text-muted-foreground">Nothing assigned to you. 🎉</li>}

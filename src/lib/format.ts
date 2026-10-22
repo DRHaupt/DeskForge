@@ -15,7 +15,8 @@ export function timeAgo(d: Date | string, now = Date.now()): string {
   const secs = Math.round((date.getTime() - now) / 1000);
   const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
   const abs = Math.abs(secs);
-  if (abs < 60) return rtf.format(secs, "second");
+  // Seconds would differ between the server render and hydration; keep it coarse.
+  if (abs < 60) return secs <= 0 ? "just now" : "in a moment";
   if (abs < 3600) return rtf.format(Math.round(secs / 60), "minute");
   if (abs < 86400) return rtf.format(Math.round(secs / 3600), "hour");
   if (abs < 86400 * 30) return rtf.format(Math.round(secs / 86400), "day");

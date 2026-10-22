@@ -26,10 +26,12 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
     setPending(true);
     setError(null);
     const form = new FormData(e.currentTarget);
+    const otp = form.get("otp");
     const res = await signIn("credentials", {
       email: form.get("email"),
       password: form.get("password"),
-      otp: form.get("otp") ?? undefined,
+      // Only send a code when the field is shown; undefined would be posted as the text "undefined".
+      ...(otp ? { otp } : {}),
       redirect: false,
     });
     setPending(false);

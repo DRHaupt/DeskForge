@@ -14,7 +14,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/components/ui/sonner";
 import { api } from "@/lib/api-client";
-import { timeAgo } from "@/lib/format";
+import { RelativeTime } from "@/components/relative-time";
+
 
 type Cond = { field: string; op: string; value?: unknown };
 type Action = Record<string, unknown> & { type: string };
@@ -134,7 +135,7 @@ export function AutomationsAdmin(props: Props) {
                   {a.schedule && <span className="text-muted-foreground"> ({a.schedule})</span>}
                 </TableCell>
                 <TableCell className="text-sm">{a.runCount}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{a.lastRunAt ? timeAgo(a.lastRunAt) : "never"}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{a.lastRunAt ? <RelativeTime date={a.lastRunAt} /> : "never"}</TableCell>
                 <TableCell>
                   <Switch aria-label={`${a.name} active`} checked={a.isActive} onCheckedChange={() => toggle(a)} />
                 </TableCell>
@@ -427,7 +428,7 @@ function Editor({ value, onClose, onSaved, ...p }: Props & { value: ReturnType<t
               <ul className="mt-1 space-y-1 text-xs">
                 {(value as unknown as Automation).runs.map((r) => (
                   <li key={r.id}>
-                    <Badge variant={r.success ? "secondary" : "destructive"}>{r.success ? "ok" : "failed"}</Badge> {timeAgo(r.createdAt)} · {(r.actionsRun ?? []).join("; ")} {r.error}
+                    <Badge variant={r.success ? "secondary" : "destructive"}>{r.success ? "ok" : "failed"}</Badge> <RelativeTime date={r.createdAt} /> · {(r.actionsRun ?? []).join("; ")} {r.error}
                   </li>
                 ))}
               </ul>

@@ -46,7 +46,13 @@ const LOGIN_LIMIT_PER_EMAIL = 10;
 const credentialsSchema = z.object({
   email: z.email().max(320),
   password: z.string().min(1).max(256),
-  otp: z.string().max(10).optional(),
+  // Anything that isn't a plausible code counts as "no code" (asks for one) rather than a wrong code.
+  otp: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/)
+    .optional()
+    .catch(undefined),
 });
 
 type OidcProviderConfig = BusinessConfig["auth"]["oidc"][number];

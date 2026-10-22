@@ -10,12 +10,13 @@ import { api } from "@/lib/api-client";
 
 type T = { to: string; name: string; category: string; requireComment: boolean };
 
-export function PortalReply({ ticketId, canReply, done, transitions, reopenOnReply, allowClose }: { ticketId: string; canReply: boolean; done: boolean; transitions: T[]; reopenOnReply: boolean; allowClose: boolean }) {
+export function PortalReply({ ticketId, canReply, done, transitions, reopenOnReply, allowClose, closeStatus }: { ticketId: string; canReply: boolean; done: boolean; transitions: T[]; reopenOnReply: boolean; allowClose: boolean; closeStatus: string }) {
   const router = useRouter();
   const [html, setHtml] = useState("");
   const [files, setFiles] = useState<Uploaded[]>([]);
   const [pending, setPending] = useState(false);
-  const close = allowClose ? transitions.find((t) => t.category === "closed" || t.category === "resolved") : undefined;
+  // Prefer portal.requesterCloseStatus; otherwise the first closing transition the requester may use.
+  const close = allowClose ? (transitions.find((t) => t.to === closeStatus) ?? transitions.find((t) => t.category === "closed" || t.category === "resolved")) : undefined;
   const reopen = transitions.find((t) => t.category === "open" || t.category === "new");
 
   async function run(fn: () => Promise<unknown>, ok: string) {

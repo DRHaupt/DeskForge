@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { CheckCircle2, Package } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
+import { ItemIcon } from "@/components/item-icon";
 import { getConfig } from "@/core/config/loader";
 import { requireActor } from "@/server/session";
 import { listCatalogItems } from "@/server/services/catalog";
@@ -28,7 +29,7 @@ export default async function PortalCatalog() {
               .map((i) => (
                 <Link key={i.id} href={`/portal/catalog/${i.key}`} className="rounded-xl border p-4 hover:border-primary/50 hover:bg-accent/40">
                   <span className="flex items-center gap-2 font-medium">
-                    <Package className="size-4 text-primary" aria-hidden /> {i.name}
+                    <ItemIcon name={i.icon} className="size-4 text-primary" /> {i.name}
                   </span>
                   {i.description && <span className="mt-1 block text-sm text-muted-foreground">{i.description}</span>}
                   {i.requiresApproval && (

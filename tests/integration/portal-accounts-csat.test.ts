@@ -35,8 +35,11 @@ describe("public sign-up", () => {
 
   it("is rate limited", async () => {
     const statuses: number[] = [];
-    for (let i = 0; i < 7; i++) {
-      const res = await signupRoute(req("/api/v1/public/signup", { body: { name: "Bot", email: `bot${i}@spam.example`, password: "lovely-cushions-42" }, headers: { "x-forwarded-for": "203.0.113.9" } }), params());
+    // Limit is 5 per one-minute window; 12 attempts trip it even if the run straddles a window boundary.
+    // A fresh IP per run, because counters live in Redis across test runs.
+    const ip = `10.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`;
+    for (let i = 0; i < 12; i++) {
+      const res = await signupRoute(req("/api/v1/public/signup", { body: { name: "Bot", email: `bot${i}-${Date.now()}@spam.example`, password: "lovely-cushions-42" }, headers: { "x-forwarded-for": ip } }), params());
       statuses.push(res.status);
     }
     expect(statuses).toContain(429);
