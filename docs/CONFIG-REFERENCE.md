@@ -336,6 +336,8 @@ Created once; edit afterwards in **Admin → Service catalog**.
 | `<PREFIX>_CLIENT_ID/_CLIENT_SECRET/_ISSUER` | | OIDC providers, one set per `envPrefix`. |
 | `WEBHOOK_ALLOW_PRIVATE` | `false` | Allow outgoing webhooks to private or internal addresses. |
 | `RATE_LIMIT_PER_MINUTE` | `300` | Per user, API key or IP across the API. |
+| `CLIENT_IP_HEADER` | unset | Read the visitor's IP from this header instead of `X-Forwarded-For`, e.g. `cf-connecting-ip` behind a Cloudflare Tunnel. Only set it when the app can be reached **only** through that proxy, because clients could otherwise forge it. |
+| `CADDYFILE` | `Caddyfile` | For `--profile caddy`: `Caddyfile` (automatic Let's Encrypt) or `Caddyfile.cloudflare` (behind the Cloudflare proxy, with an origin certificate). |
 | `SLA_SWEEP_SECONDS` | `60` | How often the worker checks SLA timers. |
 | `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` | | Creates the first admin on `config:sync` (first start) if no admin exists. |
 | `MULTI_TENANT` | `false` | Reserved for the future multi-tenant mode. |

@@ -1,0 +1,30 @@
+# Caddy config for a site behind the Cloudflare proxy (orange cloud).
+# Select it with CADDYFILE=Caddyfile.cloudflare in .env and run
+# `docker compose --profile caddy up -d`. See docs/DEPLOYING-A-NEW-BUSINESS.md.
+#
+# - TLS uses a Cloudflare Origin Certificate (Cloudflare SSL mode "Full (strict)").
+#   Put it in deploy/certs/origin.pem and deploy/certs/origin.key.
+# - Only Cloudflare's addresses are trusted to report the visitor's IP, so rate
+#   limits and audit logs see real clients, not Cloudflare edge servers.
+#   Refresh the list with scripts/update-cloudflare-ips.sh.
+{
+	servers {
+		import /etc/caddy/deploy/cloudflare-ips.caddy
+		client_ip_headers CF-Connecting-IP X-Forwarded-For
+	}
+}
+
+{$DOMAIN} {
+	tls /etc/caddy/deploy/certs/origin.pem /etc/caddy/deploy/certs/origin.key {
+		# Optional, recommended: Authenticated Origin Pulls. Only Cloudflare can
+		# then connect to this server. Enable it in the Cloudflare dashboard
+		# (SSL/TLS → Origin Server), save Cloudflare's CA certificate as
+		# deploy/certs/cloudflare-origin-pull-ca.pem, and uncomment:
+		# client_auth {
+		# 	mode require_and_verify
+		# 	trust_pool file /etc/caddy/deploy/certs/cloudflare-origin-pull-ca.pem
+		# }
+	}
+	encode zstd gzip
+	reverse_proxy app:3000
+}

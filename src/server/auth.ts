@@ -21,6 +21,7 @@ import { logger } from "./logger";
 import { dummyVerify, verifyPassword } from "./passwords";
 import { verifyTotp } from "./totp";
 import { rateLimit } from "./rate-limit";
+import { clientIpFrom } from "./client-ip";
 import { normalizeEmail, provisionUser } from "./users";
 
 class InvalidLogin extends CredentialsSignin {
@@ -82,7 +83,7 @@ async function authorizeCredentials(raw: unknown, request: Request) {
   const parsed = credentialsSchema.safeParse(raw);
   if (!parsed.success) throw new InvalidLogin();
   const email = normalizeEmail(parsed.data.email);
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+  const ip = clientIpFrom(request.headers);
 
   const [byIp, byEmail] = await Promise.all([rateLimit(`login:ip:${ip ?? "unknown"}`, LOGIN_LIMIT_PER_IP), rateLimit(`login:email:${email}`, LOGIN_LIMIT_PER_EMAIL)]);
   if (!byIp.allowed || !byEmail.allowed) throw new RateLimited();

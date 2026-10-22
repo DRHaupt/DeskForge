@@ -14,6 +14,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getEnv } from "@/server/env";
 import { logger } from "@/server/logger";
 import { rateLimit } from "@/server/rate-limit";
+import { clientIpFrom } from "@/server/client-ip";
 import { parseRawEmail, processInbound, type InboundMessage } from "@/server/mail/inbound";
 
 export const dynamic = "force-dynamic";
@@ -65,7 +66,7 @@ function fromPostmark(j: PostmarkLike): InboundMessage {
 
 export async function POST(req: NextRequest) {
   if (!secretOk(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = clientIpFrom(req.headers) ?? "unknown";
   if (!(await rateLimit(`inbound-email:${ip}`, 600)).allowed) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   const length = Number(req.headers.get("content-length") ?? 0);
   if (length > 40 * 1024 * 1024) return NextResponse.json({ error: "Message too large" }, { status: 413 });

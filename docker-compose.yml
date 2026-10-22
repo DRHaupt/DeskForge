@@ -6,7 +6,8 @@
 #
 # Optional profiles:
 #   --profile minio   S3-compatible object storage for attachments
-#   --profile caddy   Caddy reverse proxy with automatic HTTPS (set DOMAIN in .env)
+#   --profile caddy   Caddy reverse proxy with automatic HTTPS (set DOMAIN in .env;
+#                     behind Cloudflare also set CADDYFILE=Caddyfile.cloudflare)
 
 name: ${COMPOSE_PROJECT_NAME:-deskforge}
 
@@ -96,11 +97,13 @@ services:
     restart: unless-stopped
     environment:
       DOMAIN: ${DOMAIN:-localhost}
+    # CADDYFILE=Caddyfile.cloudflare when the site sits behind the Cloudflare proxy.
+    command: ["caddy", "run", "--config", "/etc/caddy/deploy/${CADDYFILE:-Caddyfile}", "--adapter", "caddyfile"]
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./deploy:/etc/caddy/deploy:ro
       - caddydata:/data
     depends_on:
       - app

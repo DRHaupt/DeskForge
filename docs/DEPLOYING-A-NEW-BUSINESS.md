@@ -143,6 +143,67 @@ Forward to `APP_BIND:APP_PORT` (default `127.0.0.1:3000`). Pass the `Host` and
 `X-Forwarded-*` headers, allow request bodies at least as large as
 `UPLOAD_MAX_MB`, and set `AUTH_TRUST_HOST=true`.
 
+### HTTPS option D: behind Cloudflare
+
+If the domain's DNS is on Cloudflare with the proxy on (orange cloud), use an
+origin certificate instead of Let's Encrypt, and tell Caddy to trust
+Cloudflare's addresses so the app sees real visitor IPs.
+
+**In the Cloudflare dashboard** (for your zone):
+
+1. **DNS**: an `A` record `help` pointing at the server's IP, **Proxied** (orange cloud).
+2. **SSL/TLS → Overview**: encryption mode **Full (strict)**. *Flexible* causes redirect loops and leaves the hop to your server unencrypted.
+3. **SSL/TLS → Origin Server → Create Certificate**: keep the RSA key, list `help.acme.example`, and pick a validity (up to 15 years). Copy the certificate and private key.
+4. **SSL/TLS → Edge Certificates**: turn on *Always Use HTTPS*, and set minimum TLS version to 1.2.
+5. Make sure these are **off** for the help desk host: **Rocket Loader** and **Email Address Obfuscation** (Speed / Scrape Shield, or a Configuration Rule for the hostname). Both rewrite pages and break the app's scripts. Don't add "Cache Everything" rules: pages are personal and must not be cached.
+
+**On the server**, in the deployment folder:
+
+```sh
+nano deploy/certs/origin.pem      # paste the origin certificate
+nano deploy/certs/origin.key      # paste the private key
+chmod 600 deploy/certs/*
+```
+
+In `.env`:
+
+```ini
+APP_BASE_URL=https://help.acme.example
+AUTH_TRUST_HOST=true
+DOMAIN=help.acme.example
+CADDYFILE=Caddyfile.cloudflare
+```
+
+Start it, then refresh Cloudflare's IP list (and keep it fresh weekly):
+
+```sh
+docker compose --profile caddy up -d --build
+scripts/update-cloudflare-ips.sh
+( crontab -l 2>/dev/null; echo "0 4 * * 1  cd $PWD && scripts/update-cloudflare-ips.sh >/dev/null" ) | crontab -
+```
+
+**Recommended: lock the server to Cloudflare.** Docker-published ports
+**bypass UFW**, so firewall rules won't stop people reaching ports 80 and 443
+directly. Use Cloudflare's *Authenticated Origin Pulls* instead: Cloudflare
+then presents a client certificate, and Caddy rejects anyone else.
+
+1. **SSL/TLS → Origin Server → Authenticated Origin Pulls**: on.
+2. Download Cloudflare's origin-pull CA certificate (linked from that setting's documentation) to `deploy/certs/cloudflare-origin-pull-ca.pem`.
+3. In `deploy/Caddyfile.cloudflare`, uncomment the `client_auth { … }` block, then run `docker compose --profile caddy restart caddy`.
+
+**Things that behave differently behind Cloudflare:**
+
+- **Upload size**: Cloudflare limits request bodies to 100 MB on Free and Pro plans. Keep `UPLOAD_MAX_MB` below that.
+- **Bot protection**: *Bot Fight Mode* can challenge your mail provider's posts to `/api/inbound/email` and scripts calling `/api/v1`. If inbound email or API calls start getting 403s or challenge pages, turn it off. On paid plans, add a WAF skip rule for those paths instead.
+- **Inbound email webhooks** can come from your provider straight through Cloudflare. Nothing else is needed.
+
+**Alternative: Cloudflare Tunnel (no open ports at all).** Run `cloudflared`
+on the server, route `help.acme.example` to `http://localhost:3000`, and keep
+`APP_BIND=127.0.0.1` so only the tunnel can reach the app. Don't use the Caddy
+profile in this setup, and set `CLIENT_IP_HEADER=cf-connecting-ip` in `.env`
+so rate limits and audit logs see visitors' real IPs. That header is safe to
+trust only because nothing but the tunnel can reach the app.
+
 ## 5. Email
 
 ### Outgoing (SMTP)
@@ -344,5 +405,9 @@ because only one process can listen on ports 80 and 443.
 | Replies create new tickets | The provider must keep the `In-Reply-To`/`References` headers, or keep `[INC0000123]` in the subject. |
 | SLA timers never warn or breach | The worker isn't running, or business hours/holidays exclude the current time. |
 | Uploads fail | `client_max_body_size` in Nginx is below `UPLOAD_MAX_MB`, or the file type isn't allowed. |
+| Cloudflare error 525/526 | SSL mode isn't *Full (strict)*, or `deploy/certs/origin.pem`/`.key` are missing or don't match. |
+| Cloudflare redirect loop | SSL mode is *Flexible*; switch to *Full (strict)*. |
+| Everyone hits sign-in rate limits behind Cloudflare | `CADDYFILE` isn't `Caddyfile.cloudflare`, or `deploy/cloudflare-ips.caddy` is out of date; run `scripts/update-cloudflare-ips.sh`. |
+| Pages half-load or buttons don't work behind Cloudflare | Rocket Loader or Email Address Obfuscation is on for the host. |
 
 Upgrading to a new DeskForge version is covered in [`UPGRADING.md`](UPGRADING.md).

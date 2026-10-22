@@ -20,6 +20,7 @@ import { authenticateApiKey } from "./api-keys";
 import { getCurrentActor } from "./session";
 import { logger } from "./logger";
 import { rateLimit } from "./rate-limit";
+import { clientIpFrom } from "./client-ip";
 import { randomUUID } from "node:crypto";
 
 export class HttpError extends Error {
@@ -75,7 +76,7 @@ type RouteCtx = { params: Promise<Record<string, string | string[]>> };
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 function clientIp(req: NextRequest): string {
-  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
+  return clientIpFrom(req.headers) ?? "unknown";
 }
 
 function sameOrigin(req: NextRequest): boolean {

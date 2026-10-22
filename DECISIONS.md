@@ -540,3 +540,15 @@ transport, so nothing leaves the machine.
 "N seconds ago" made the server and browser render different text (a hydration
 mismatch). Relative times now read "just now" under a minute, and are rendered
 in a `<time>` element with the exact timestamp on hover.
+
+### D-063 · Running behind Cloudflare
+`deploy/Caddyfile.cloudflare` serves a Cloudflare Origin Certificate (SSL mode
+Full (strict)) and lists Cloudflare's address ranges as `trusted_proxies`.
+Caddy then passes on the visitor's IP in `X-Forwarded-For` only for requests
+that really come from Cloudflare, and replaces forged values from anyone else
+(verified with Caddy 2.11). The range list ships with the repo and is
+refreshed by `scripts/update-cloudflare-ips.sh`. Because Docker-published ports
+bypass UFW, the documented way to lock the origin down is Authenticated Origin
+Pulls (mTLS), not a host firewall. For Cloudflare Tunnel setups,
+`CLIENT_IP_HEADER=cf-connecting-ip` makes the app read Cloudflare's header
+directly. All client-IP reads go through `src/server/client-ip.ts`.

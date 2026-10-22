@@ -40,6 +40,8 @@ const envSchema = z.object({
 
   /** Allow webhooks to private/internal addresses (off by default to prevent SSRF). */
   WEBHOOK_ALLOW_PRIVATE: bool,
+  /** Header holding the visitor's IP when a trusted proxy sets one (e.g. cf-connecting-ip behind a Cloudflare Tunnel). */
+  CLIENT_IP_HEADER: z.string().trim().toLowerCase().regex(/^[a-z0-9-]+$/).optional(),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(300),
   SEED_ADMIN_EMAIL: z.string().optional(),
   SEED_ADMIN_PASSWORD: z.string().optional(),
