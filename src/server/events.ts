@@ -33,6 +33,8 @@ export type TicketEvent = {
   commentId?: string;
   /** Prevents automation loops: depth of automation-triggered changes. */
   depth?: number;
+  /** Comment posted as part of a status change (notifications are sent by the status change). */
+  viaTransition?: boolean;
   at: string;
 };
 
@@ -50,7 +52,7 @@ export function setEventQueueing(on: boolean) {
   queueingEnabled = on;
 }
 
-export async function emitTicketEvent(type: TicketEventType, ticketId: string, actor: Actor, extra: Partial<Pick<TicketEvent, "changes" | "commentId" | "depth">> = {}): Promise<TicketEvent> {
+export async function emitTicketEvent(type: TicketEventType, ticketId: string, actor: Actor, extra: Partial<Pick<TicketEvent, "changes" | "commentId" | "depth" | "viaTransition">> = {}): Promise<TicketEvent> {
   const event: TicketEvent = {
     type,
     ticketId,

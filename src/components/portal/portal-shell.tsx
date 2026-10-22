@@ -4,6 +4,7 @@ import { isAgent, type UserActor } from "@/core/rbac/actor";
 import { BrandMark } from "@/components/brand/brand-mark";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/console/user-menu";
+import { NotificationBell } from "@/components/console/notification-bell";
 
 export function PortalShell({ actor, children }: { actor: UserActor | null; children: React.ReactNode }) {
   const cfg = getConfig();
@@ -35,6 +36,7 @@ export function PortalShell({ actor, children }: { actor: UserActor | null; chil
                     <Link href="/agent">Agent console</Link>
                   </Button>
                 )}
+                <NotificationBell portal={!isAgent(actor)} />
                 <UserMenu name={actor.name} email={actor.email} />
               </>
             ) : (

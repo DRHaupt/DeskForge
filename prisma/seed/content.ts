@@ -11,6 +11,7 @@ import type { Db } from "../../src/server/db";
 import { loadUserActor } from "../../src/server/actor";
 import { setEventQueueing } from "../../src/server/events";
 import { addComment, createTicket, transitionTicket } from "../../src/server/services/tickets";
+import { reconcileTicketSla } from "../../src/server/sla";
 import { seedExtras } from "./extras";
 
 type Scenario = { title: string; body: string; reply?: string; note?: string; followUp?: string; resolution?: string; impact?: number; urgency?: number; tags?: string[] };
@@ -146,8 +147,9 @@ async function retime(db: Db, ticketId: string, createdAt: Date) {
   let t = createdAt.getTime();
   const span = Math.max(Date.now() - t - 3600_000, 3600_000);
   const step = Math.min(span / Math.max(events.length + 1, 2), 26 * 3600_000);
-  for (const e of events) {
-    t += step * (0.4 + rand() * 0.8);
+  for (const [idx, e] of events.entries()) {
+    // First touch usually comes quickly; later updates are spread out.
+    t += idx === 0 ? (8 + rand() * 50) * 60_000 : step * (0.4 + rand() * 0.8);
     const at = new Date(Math.min(t, Date.now() - 60_000));
     if (e.kind === "c") await db.comment.update({ where: { id: e.id }, data: { createdAt: at } });
     else await db.statusHistory.update({ where: { id: e.id }, data: { createdAt: at } });
@@ -249,7 +251,18 @@ export async function seedDemoContent(db: Db, cfg: BusinessConfig): Promise<void
       console.warn(`  ${ticket.number}: ${(err as Error).message}`);
     }
     await retime(db, ticket.id, createdAt);
+    // Rebuild SLA timers from the backdated history.
+    await db.sLAInstance.deleteMany({ where: { ticketId: ticket.id } });
+    await reconcileTicketSla(ticket.id);
     created++;
+  }
+  // Mark overdue timers as breached/warned without running escalations on demo data.
+  await db.$executeRaw`UPDATE sla_instances SET breached_at = due_at, warned_at = coalesce(warned_at, due_at) WHERE status = 'RUNNING' AND due_at < now() AND breached_at IS NULL`;
+  await db.$executeRaw`UPDATE sla_instances SET warned_at = warn_at WHERE status = 'RUNNING' AND warn_at < now() AND warned_at IS NULL`;
+  // A few in-app notifications so the bell isn't empty.
+  for (const a of agents) {
+    const mine = await db.ticket.findMany({ where: { assigneeId: a.id, statusCategory: { in: ["NEW", "OPEN"] } }, orderBy: { createdAt: "desc" }, take: 3 });
+    await db.notification.createMany({ data: mine.map((t) => ({ userId: a.id, type: "ticket.assigned", title: `${t.number} assigned to you`, body: t.title, link: `/agent/tickets/${t.number}`, ticketId: t.id, createdAt: t.createdAt })) });
   }
   console.log(`  created ${created} demo tickets`);
   await seedExtras(db, cfg);

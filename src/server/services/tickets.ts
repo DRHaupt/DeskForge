@@ -24,6 +24,7 @@ import { emitTicketEvent } from "../events";
 import { plainTextToHtml, richText } from "../richtext";
 import { normalizeEmail, provisionUser } from "../users";
 import { ticketVisibilityWhere } from "./ticket-access";
+import "../hooks";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -684,8 +685,8 @@ export async function transitionTicket(actor: Actor, id: string, input: z.infer<
 
   const changes = { status: { from: ticket.status, to: target.key }, statusCategory: { from: ticket.statusCategory, to: category } };
   await audit(actor, { action: "ticket.transition", entityType: "ticket", entityId: ticket.id, changes }, opts.ctx);
-  await emitTicketEvent("ticket.status_changed", ticket.id, actor, { changes, depth: opts.depth });
-  if (commentId) await emitTicketEvent("ticket.commented", ticket.id, actor, { commentId, depth: opts.depth });
+  await emitTicketEvent("ticket.status_changed", ticket.id, actor, { changes, commentId, depth: opts.depth });
+  if (commentId) await emitTicketEvent("ticket.commented", ticket.id, actor, { commentId, depth: opts.depth, viaTransition: true });
   return { id: ticket.id, status: target.key, statusCategory: category };
 }
 

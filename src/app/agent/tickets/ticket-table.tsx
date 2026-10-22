@@ -27,7 +27,7 @@ export type Row = {
   assignee: string | null;
   team: string | null;
   updatedAt: string;
-  sla: { metric: string; status: string; dueAt: string }[];
+  sla: { metric: string; status: string; dueAt: string; breachedAt: string | null }[];
 };
 
 const sel = "h-8 rounded-md border border-input bg-background px-2 text-sm";

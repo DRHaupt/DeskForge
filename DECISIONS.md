@@ -220,3 +220,83 @@ without injecting HTML.
 Bulk updates call the same service functions one ticket at a time, so every
 workflow, permission and audit rule applies, and the result lists per-ticket
 failures instead of failing the whole batch.
+
+## Phase 3 — SLAs, email, notifications
+
+### D-028 · SLA timers are reconciled, not event-scripted
+After **every** ticket change, `reconcileTicketSla()` compares the ticket's
+current facts (priority, type, status, first response, resolution) with its
+stored timers and moves them to the state they should be in: start, pause,
+resume, stop as met or breached, retarget, or cancel. The rules are a pure
+function (`core/sla/engine.ts`) with unit tests. This keeps timers correct
+whatever made the change (UI, email, API, automation, seed), and re-running it
+is harmless.
+
+- A running timer stores `due_at`. A paused timer stores `elapsed_mins`.
+  Resuming recomputes `due_at` from the remaining business time.
+- Pausing happens when the status is in the policy's `pauseStatuses`
+  (default `sla.pauseStatuses`), or when the workflow state has
+  `pausesSla: true`.
+- A priority or type change that selects a different target keeps the time
+  already used and recomputes the due date. Human overrides (`sla.override`)
+  survive recalculation and are audited with a reason.
+- The first-response timer stops at the first **public** reply from staff.
+  Resolving a ticket also stops it.
+- Reopening a ticket resumes the resolution timer from where it stopped. A
+  breach stays on record.
+
+### D-029 · Business-hours math without a date library
+`core/sla/calendar.ts` adds and measures business minutes in the business's
+time zone using `Intl` only. It handles weekends, holidays, split shifts and
+DST changes, and is tested against fixed instants. Policies with
+`calendar: always` count every minute.
+
+### D-030 · Breaches come from a sweep, escalation is configurable
+The worker runs `sweepSla()` every minute. It sets `warned_at` and
+`breached_at` with conditional updates (safe with several workers), emits
+`sla.warning` / `sla.breached`, and applies `sla.escalation`: notify assignee,
+team leads and the team's escalation contact; optionally reassign to the
+escalation team or contact; optionally raise the priority one level.
+
+### D-031 · Email threading
+Every outbound email is stored in `outbound_emails` with a Message-ID of the
+form `<INC0000042.random@support-domain>` and `References:
+<ticket-INC0000042@support-domain>`. Inbound mail is matched to a ticket in
+this order: In-Reply-To/References against our Message-IDs → Message-IDs of
+earlier inbound mail on the ticket → a ticket number in the subject.
+
+### D-032 · Inbound email safety
+- Replies are appended only when the sender may see the ticket (requester,
+  watcher, CC'd address, or staff). Anyone else's mail opens a **new** ticket,
+  so knowing a ticket number isn't enough to post into it.
+- Mail is ignored (logged as `IGNORED`) when it's an auto-reply
+  (`Auto-Submitted`, `X-Autoreply`, `Precedence: bulk/list/junk`), comes from
+  our own addresses, matches `email.ignoreSenders`, or was already processed
+  (same Message-ID).
+- Quoted history is stripped using our reply marker and common "On … wrote:"
+  and Outlook headers. The comment stores only the new text.
+- Unknown senders become requesters only when `email.createUnknownSenders` is
+  true.
+
+### D-033 · Inbound webhook formats
+`POST /api/inbound/email` accepts raw MIME (`message/rfc822`), form posts with
+a raw MIME field (`body-mime` for Mailgun, `email` for SendGrid, or `raw`),
+`{ "raw": "…" }` JSON, or Postmark-style JSON. It's authenticated by
+`INBOUND_EMAIL_SECRET` (query string or Basic auth password). It returns 200
+for handled or ignored mail so providers don't retry, and 500 only when
+processing fails.
+
+### D-034 · Notifications
+The worker turns ticket events into in-app notifications (bell, polled every
+30 s) and emails. Rules:
+- Nobody is notified about their own action.
+- Requesters get email for their acknowledgement, staff public replies,
+  resolution or closure, and merges. They never get internal notes.
+- A reply posted as part of a status change sends **one** email (the
+  status-change email, which includes the comment).
+- Mentions always notify. Unassigned tickets notify the whole team.
+- Users can switch off email on their account page. In-app notifications
+  can't be switched off.
+- When SMTP isn't configured, emails are rendered and logged, and marked
+  `SKIPPED` in the email log, so the rest of the pipeline can still be
+  tested.

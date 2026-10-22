@@ -181,6 +181,8 @@ model User {
   totpEnabled       Boolean   @default(false) @map("totp_enabled")
   /// Bumped to invalidate all existing sessions for this user.
   sessionVersion    Int       @default(0) @map("session_version")
+  /// Receive email for ticket activity (in-app notifications are always on).
+  notifyByEmail     Boolean   @default(true) @map("notify_by_email")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
@@ -478,6 +480,7 @@ model Ticket {
   csatResponse   CSATResponse?
   automationRuns AutomationRun[]
   inboundEmails  InboundEmail[]
+  outboundEmails OutboundEmail[]
 
   @@index([tenantId])
   @@index([statusCategory, teamId])
@@ -1099,6 +1102,41 @@ model InboundEmail {
   ticket Ticket? @relation(fields: [ticketId], references: [id], onDelete: SetNull)
 
   @@map("inbound_emails")
+}
+
+enum OutboundEmailStatus {
+  QUEUED
+  SENT
+  FAILED
+  SKIPPED
+}
+
+/// Every email we send. Message-IDs are used to thread replies back to tickets.
+model OutboundEmail {
+  id        String              @id @default(cuid())
+  tenantId  String?             @map("tenant_id")
+  ticketId  String?             @map("ticket_id")
+  /// Why this email was sent, e.g. "ticket.reply", "ticket.created.ack", "sla.breached".
+  kind      String
+  toAddress String              @map("to_address")
+  ccAddress String[]            @map("cc_address")
+  subject   String
+  messageId String              @unique @map("message_id")
+  inReplyTo String?             @map("in_reply_to")
+  html      String
+  text      String
+  status    OutboundEmailStatus @default(QUEUED)
+  attempts  Int                 @default(0)
+  error     String?
+  sentAt    DateTime?           @map("sent_at")
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
+
+  ticket Ticket? @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId])
+  @@index([status, createdAt])
+  @@map("outbound_emails")
 }
 
 /// Key/value store for small runtime state (e.g. IMAP last-seen UIDs).

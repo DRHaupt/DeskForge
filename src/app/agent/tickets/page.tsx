@@ -116,7 +116,7 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
             assignee: t.assignee?.name ?? null,
             team: t.team?.name ?? null,
             updatedAt: t.updatedAt.toISOString(),
-            sla: t.slaInstances.map((s) => ({ metric: s.metric, status: s.status, dueAt: s.dueAt.toISOString() })),
+            sla: t.slaInstances.map((s) => ({ metric: s.metric, status: s.status, dueAt: s.dueAt.toISOString(), breachedAt: s.breachedAt?.toISOString() ?? null })),
           }))}
           meta={meta}
           canBulk={can(actor, "ticket.bulk")}

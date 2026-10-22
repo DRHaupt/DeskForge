@@ -20,6 +20,7 @@ import { api } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/format";
 import { stateColor, stateLabel } from "@/lib/ticket-meta";
 import { Composer } from "./composer";
+import { SlaCard } from "./sla-card";
 import { Timeline } from "./timeline";
 import type { WorkspaceProps } from "./types";
 
@@ -181,6 +182,7 @@ export function TicketWorkspace(props: WorkspaceProps) {
       </div>
 
       <aside aria-label="Ticket properties" className="space-y-4">
+        <SlaCard ticket={ticket} timezone={meta.timezone} canOverride={perms.slaOverride} call={call} />
         <Properties {...props} busy={busy} call={call} />
         <Links {...props} call={call} onAdd={() => setLinkOpen(true)} />
       </aside>
@@ -569,11 +571,6 @@ function Properties({ ticket, meta, perms, teams, agents, categories, assets, me
           <p>Updated {formatDateTime(ticket.updatedAt, meta.timezone)}</p>
           {ticket.firstRespondedAt && <p>First response {formatDateTime(ticket.firstRespondedAt, meta.timezone)}</p>}
           {ticket.resolvedAt && <p>Resolved {formatDateTime(ticket.resolvedAt, meta.timezone)}</p>}
-          {ticket.sla.map((s) => (
-            <p key={s.metric}>
-              {s.metric === "FIRST_RESPONSE" ? "Response" : "Resolution"} SLA ({s.policy}): {s.status.toLowerCase()}, due {formatDateTime(s.dueAt, meta.timezone)}
-            </p>
-          ))}
         </CardContent>
       </Card>
     </>

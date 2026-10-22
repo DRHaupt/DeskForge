@@ -8,6 +8,7 @@ import { SidebarNav } from "./sidebar-nav";
 import { MobileNav } from "./mobile-nav";
 import { UserMenu } from "./user-menu";
 import { CommandPalette } from "./command-palette";
+import { NotificationBell } from "./notification-bell";
 import { isAgent } from "@/core/rbac/actor";
 
 export function visibleNav(actor: UserActor): NavSection[] {
@@ -37,6 +38,7 @@ export function ConsoleShell({ actor, children, topbar }: { actor: UserActor; ch
         <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur sm:px-5">
           <MobileNav sections={sections} brand={brand} />
           <div className="min-w-0 flex-1">{topbar ?? (isAgent(actor) && <CommandPalette kb={getConfig().features.knowledgeBase} />)}</div>
+          <NotificationBell />
           <UserMenu name={actor.name} email={actor.email} links={[{ href: "/portal", label: "Open customer portal" }]} />
         </header>
         <main id="main" className="flex-1 p-4 sm:p-6">

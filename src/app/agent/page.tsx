@@ -21,7 +21,7 @@ export default async function AgentHome() {
     count({ assignee: "me", open: "true" }),
     count({ assignee: "none", open: "true" }),
     count({ open: "true" }),
-    db.sLAInstance.count({ where: { status: { in: ["BREACHED"] }, ticket: { AND: [filterWhere(actor, { open: "true" }), { assigneeId: actor.id }] } } }),
+    db.sLAInstance.count({ where: { breachedAt: { not: null }, status: { in: ["RUNNING", "PAUSED"] }, ticket: { AND: [filterWhere(actor, { open: "true" }), { assigneeId: actor.id }] } } }),
     listTickets(actor, ticketFilterSchema.parse({ assignee: "me", open: "true", pageSize: "8" })),
   ]);
   const stats = [

@@ -3,7 +3,7 @@
 import { formatMinutes } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-type Sla = { metric: string; status: string; dueAt: string | Date };
+type Sla = { metric: string; status: string; dueAt: string | Date; breachedAt?: string | Date | null };
 
 /** Shows the most urgent running SLA timer: time left, or how long overdue. */
 export function SlaBadge({ sla, compact = false, now = Date.now() }: { sla: Sla[]; compact?: boolean; now?: number }) {
@@ -11,7 +11,7 @@ export function SlaBadge({ sla, compact = false, now = Date.now() }: { sla: Sla[
   if (!active.length) return compact ? <span className="text-xs text-muted-foreground">—</span> : null;
   const next = active.sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())[0]!;
   const mins = (new Date(next.dueAt).getTime() - now) / 60000;
-  const breached = next.status === "BREACHED" || mins < 0;
+  const breached = next.status === "BREACHED" || Boolean(next.breachedAt) || mins < 0;
   const paused = next.status === "PAUSED";
   const label = next.metric === "FIRST_RESPONSE" ? "Response" : "Resolve";
   const text = paused ? "paused" : breached ? `${formatMinutes(-mins)} over` : `${formatMinutes(mins)} left`;

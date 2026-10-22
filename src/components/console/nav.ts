@@ -28,6 +28,7 @@ export const NAV: NavSection[] = [
       { href: "/admin/roles", label: "Roles", icon: "shield", permissions: ["role.manage"] },
       { href: "/admin/teams", label: "Teams", icon: "users-round", permissions: ["team.manage"] },
       { href: "/admin/organizations", label: "Organizations", icon: "building", permissions: ["org.view"] },
+      { href: "/admin/email", label: "Email log", icon: "message", permissions: ["config.view"] },
       { href: "/admin/audit", label: "Audit log", icon: "scroll", permissions: ["audit.view"] },
     ],
   },

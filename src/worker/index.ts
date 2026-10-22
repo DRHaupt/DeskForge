@@ -62,7 +62,11 @@ async function main() {
 
 /** Repeating job ids → interval in ms. Extended as modules are added. */
 function repeatingJobs(): Record<string, number> {
-  return {};
+  return {
+    "sla-sweep": 60_000,
+    // Each mailbox has its own pollSeconds; this tick just checks which are due.
+    "imap-poll": 15_000,
+  };
 }
 
 main().catch((err) => {
