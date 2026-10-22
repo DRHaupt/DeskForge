@@ -20,6 +20,7 @@ import { envValue } from "./env";
 import { logger } from "./logger";
 import { dummyVerify, verifyPassword } from "./passwords";
 import { verifyTotp } from "./totp";
+import { rateLimit } from "./rate-limit";
 import { normalizeEmail, provisionUser } from "./users";
 
 class InvalidLogin extends CredentialsSignin {
@@ -34,6 +35,13 @@ class OtpRequired extends CredentialsSignin {
 class OtpInvalid extends CredentialsSignin {
   code = "otp_invalid";
 }
+class RateLimited extends CredentialsSignin {
+  code = "rate_limited";
+}
+
+/** Sign-in attempts allowed per minute, per client IP and per account. */
+const LOGIN_LIMIT_PER_IP = 20;
+const LOGIN_LIMIT_PER_EMAIL = 10;
 
 const credentialsSchema = z.object({
   email: z.email().max(320),
@@ -70,6 +78,9 @@ async function authorizeCredentials(raw: unknown, request: Request) {
   const email = normalizeEmail(parsed.data.email);
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
 
+  const [byIp, byEmail] = await Promise.all([rateLimit(`login:ip:${ip ?? "unknown"}`, LOGIN_LIMIT_PER_IP), rateLimit(`login:email:${email}`, LOGIN_LIMIT_PER_EMAIL)]);
+  if (!byIp.allowed || !byEmail.allowed) throw new RateLimited();
+
   const user = await db.user.findUnique({ where: { email } });
   if (!user || !user.passwordHash || !user.isActive) {
     await dummyVerify();
@@ -77,8 +88,8 @@ async function authorizeCredentials(raw: unknown, request: Request) {
   }
   if (user.lockedUntil && user.lockedUntil > new Date()) throw new LockedOut();
 
-  const ok = await verifyPassword(parsed.data.password, user.passwordHash);
-  if (!ok) {
+  // Wrong passwords and wrong 2FA codes both count towards the lockout.
+  const fail = async (err: CredentialsSignin, reason: string): Promise<never> => {
     const failed = user.failedLoginCount + 1;
     const lock = failed >= cfg.auth.local.maxFailedAttempts;
     await db.user.update({
@@ -88,13 +99,16 @@ async function authorizeCredentials(raw: unknown, request: Request) {
         lockedUntil: lock ? new Date(Date.now() + cfg.auth.local.lockoutMinutes * 60_000) : user.lockedUntil,
       },
     });
-    await audit(systemActor("auth"), { action: lock ? "auth.locked" : "auth.failed", entityType: "user", entityId: user.id }, { ip });
-    throw lock ? new LockedOut() : new InvalidLogin();
-  }
+    await audit(systemActor("auth"), { action: lock ? "auth.locked" : "auth.failed", entityType: "user", entityId: user.id, changes: { reason } }, { ip });
+    throw lock ? new LockedOut() : err;
+  };
+
+  const ok = await verifyPassword(parsed.data.password, user.passwordHash);
+  if (!ok) await fail(new InvalidLogin(), "password");
 
   if (user.totpEnabled && user.totpSecret) {
     if (!parsed.data.otp) throw new OtpRequired();
-    if (!verifyTotp(user.totpSecret, parsed.data.otp)) throw new OtpInvalid();
+    if (!verifyTotp(user.totpSecret, parsed.data.otp)) await fail(new OtpInvalid(), "otp");
   }
 
   await db.user.update({ where: { id: user.id }, data: { failedLoginCount: 0, lockedUntil: null, lastLoginAt: new Date() } });
@@ -200,3 +214,6 @@ export function buildAuthConfig(): NextAuthConfig {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth(() => buildAuthConfig());
+
+/** Exposed for tests only. */
+export const _authorizeCredentialsForTests = authorizeCredentials;

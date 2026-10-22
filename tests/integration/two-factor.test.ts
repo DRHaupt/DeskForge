@@ -72,3 +72,34 @@ describe("two-factor enrolment", () => {
     expect((await actorFor(u.id)).mustEnrollTwoFactor).toBe(false);
   });
 });
+
+describe("password sign-in protection", () => {
+  const login = async (email: string, password: string, otp?: string, ip = "203.0.113.9") => {
+    const { _authorizeCredentialsForTests } = await import("@/server/auth");
+    return _authorizeCredentialsForTests({ email, password, otp }, new Request("http://localhost/api/auth/callback/credentials", { headers: { "x-forwarded-for": ip } }));
+  };
+
+  it("counts wrong 2FA codes towards the lockout", async () => {
+    const u = await makeUser("otp-user@northbeam-it.example", ["agent"]);
+    const agent = await actorFor(u.id);
+    const { secret } = await beginEnrollment(agent);
+    await confirmEnrollment(agent, { code: totpCode(secret) });
+    await expect(login(u.email, "Test-Password-123!")).rejects.toMatchObject({ code: "otp_required" });
+    await expect(login(u.email, "Test-Password-123!", "000000", "203.0.113.10")).rejects.toMatchObject({ code: "otp_invalid" });
+    expect((await db.user.findUniqueOrThrow({ where: { id: u.id } })).failedLoginCount).toBe(1);
+    await expect(login(u.email, "Test-Password-123!", totpCode(secret), "203.0.113.11")).resolves.toMatchObject({ id: u.id });
+    expect((await db.user.findUniqueOrThrow({ where: { id: u.id } })).failedLoginCount).toBe(0);
+  });
+
+  it("rate-limits attempts per account", async () => {
+    const u = await makeUser("hammered@northbeam-it.example", ["requester"]);
+    await db.user.update({ where: { id: u.id }, data: { failedLoginCount: 0 } });
+    const codes: string[] = [];
+    for (let i = 0; i < 12; i++) {
+      // Vary the IP so only the per-account limit applies; the right password each time avoids the lockout.
+      codes.push(await login(u.email, "Test-Password-123!", undefined, `198.51.100.${i}`).then(() => "ok", (e: { code: string }) => e.code));
+    }
+    expect(codes.slice(0, 10).every((c) => c === "ok")).toBe(true);
+    expect(codes.slice(10)).toEqual(["rate_limited", "rate_limited"]);
+  });
+});

@@ -11,6 +11,8 @@ export default defineConfig({
     // Integration tests share one database; run files sequentially.
     fileParallelism: false,
     testTimeout: 20000,
+    // next-auth imports "next/server" without an extension; let Vite resolve it.
+    server: { deps: { inline: ["next-auth"] } },
     hookTimeout: 60000,
   },
 });

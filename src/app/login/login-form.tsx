@@ -12,6 +12,7 @@ const MESSAGES: Record<string, string> = {
   invalid_credentials: "That email and password don't match.",
   locked: "Too many failed attempts. Try again later.",
   otp_invalid: "That code isn't right. Check your authenticator app and try again.",
+  rate_limited: "Too many sign-in attempts. Wait a minute and try again.",
 };
 
 export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
