@@ -15,7 +15,11 @@ export type NavSection = { label?: string; items: NavItem[] };
 
 export const NAV: NavSection[] = [
   {
-    items: [{ href: "/agent", label: "Home", icon: "home", permissions: ["ticket.view_team", "ticket.view_all"] }],
+    items: [
+      { href: "/agent", label: "Home", icon: "home", permissions: ["ticket.view_team", "ticket.view_all"] },
+      { href: "/agent/tickets", label: "Tickets", icon: "inbox", permissions: ["ticket.view_team", "ticket.view_all"] },
+      { href: "/agent/search", label: "Search", icon: "list", permissions: ["ticket.view_team", "ticket.view_all"] },
+    ],
   },
   {
     label: "Administration",

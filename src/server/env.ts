@@ -14,7 +14,7 @@ const envSchema = z.object({
   AUTH_SECRET: z.string().min(32, "AUTH_SECRET must be at least 32 characters (generate with: openssl rand -base64 48)"),
   BUSINESS_CONFIG_PATH: z.string().default("./business.config.yaml"),
   BRANDING_DIR: z.string().default("./branding"),
-  LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
+  LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal", "silent"]).default("info"),
   /** Reserved for multi-tenant mode. Must stay false in this release. */
   MULTI_TENANT: bool,
 

@@ -138,3 +138,85 @@ nonce; `strict-dynamic`). Inline *styles* are allowed because UI primitives
 position popovers with style attributes. Other headers (HSTS when the base URL
 is https, `X-Frame-Options: DENY`, `nosniff`, Referrer-Policy,
 Permissions-Policy) come from `next.config.ts`.
+
+## Phase 2 — Ticketing core
+
+### D-017 · Who sees which tickets
+- `ticket.view_all` (team leads, auditors, admins): everything.
+- `ticket.view_team` (agents): tickets in their teams' queues, tickets with **no
+  team** (the triage pile), and tickets assigned to them.
+- `ticket.view_own` (requesters): tickets they requested or watch.
+- `ticket.view_org`, or the per-user "org ticket access" flag: everything from
+  their organization.
+
+The rule exists twice, once as a pure function (`core/tickets/access.ts`) and
+once as a Prisma `where` (`services/ticket-access.ts`), and tests cover both.
+Tickets the actor can't see return **404, not 403**, so their existence doesn't
+leak.
+
+### D-018 · Ticket numbers
+Each ticket type has its own counter, `ticket_types.next_number`, incremented
+with a single `UPDATE … RETURNING` inside the creating transaction. This means
+no gaps under concurrency, other than rolled-back creates. Numbers are
+`<prefix><zero-padded counter>`, with padding set per type in config.
+
+### D-019 · Workflow enforcement
+Every status change goes through `resolveTransition()`. A transition must exist
+in config, and the actor must hold one of its roles. The `requester` role only
+counts for the ticket's own requester. Full admins may perform any
+*configured* transition, but never an unconfigured one. Automations and other
+internal callers act as the system actor. `requireComment` is enforced on the
+server. Merging is the one deliberate bypass (see D-021).
+
+### D-020 · Requester replies move the ticket back into the queue
+A public reply from the requester on a *pending* or *resolved* ticket triggers a
+system transition to `portal.reopenStatus`, if the workflow has a transition
+from the current state. Reopening increments `reopen_count` and clears
+`resolved_at`.
+
+### D-021 · Merging
+Merging A into B moves A's comments and attachments to B, adds A's requester
+and watchers to B as watchers, closes A in the first `closed` state of its
+workflow (bypassing transition rules), sets `merged_into_id`, and records a
+`DUPLICATE_OF` link. Both tickets get a system comment.
+
+### D-022 · Timeline
+The ticket timeline merges comments, status history and selected audit entries
+(field changes, assignment, links, merges). Requesters see only public comments
+and status changes.
+
+### D-023 · Rich text and mentions
+The editor is Tiptap. Every HTML body (editor, email, API) is sanitized
+server-side with an allow-list (`src/server/richtext.ts`), and a plain-text copy
+is stored for search and email. Mentions are `<span data-type="mention"
+data-id>` nodes. Only agents can be mentioned, and mentioned agents become
+watchers.
+
+### D-024 · Attachments
+Files are uploaded first (`POST /api/v1/attachments`) and then referenced by id
+when creating a ticket or comment. Uploads that aren't linked yet are visible
+only to their uploader. Downloads re-check ticket visibility and internal-note
+visibility. Limits are `UPLOAD_MAX_MB` plus a MIME/extension allow-list.
+Executables, scripts, HTML and SVG are always blocked. Files are served with
+`nosniff` and a sandboxing CSP. Storage keys are random, and the original
+filename lives only in the database.
+
+### D-025 · Assignment permissions
+`ticket.assign` lets an agent take a ticket, release it, or move it within their
+own teams. `ticket.reassign` (team leads) allows any team or agent. Moving a
+ticket to another team without naming a person lets that team's strategy
+(round-robin / load-balanced / manual) pick someone. Round-robin locks the team
+row (`SELECT … FOR UPDATE`) so parallel creates spread fairly.
+
+### D-026 · Search
+`PostgresSearchProvider` builds a prefix `tsquery` from the user's words
+(`batt swoll` matches "battery swelling"), ranks ticket and comment hits, and
+gives an exact ticket-number match the top spot. It then filters results through
+the same visibility `where` clause, and excludes internal notes for requesters.
+Snippets come from `ts_headline`, with markers that the UI renders as `<mark>`
+without injecting HTML.
+
+### D-027 · Bulk actions reuse the single-ticket path
+Bulk updates call the same service functions one ticket at a time, so every
+workflow, permission and audit rule applies, and the result lists per-ticket
+failures instead of failing the whole batch.

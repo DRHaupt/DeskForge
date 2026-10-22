@@ -8,7 +8,7 @@ import { hashPassword, verifyPassword } from "@/server/passwords";
 
 /** Change your own password. */
 export const POST = apiRoute(
-  { authOnly: true, rateLimit: 10, auditAction: "user.password_change", body: z.object({ currentPassword: z.string().max(256).optional(), newPassword: z.string().max(256) }) },
+  { authOnly: true, status: 200, rateLimit: 10, auditAction: "user.password_change", body: z.object({ currentPassword: z.string().max(256).optional(), newPassword: z.string().max(256) }) },
   async ({ actor, body }) => {
     if (actor.kind !== "user") throw new HttpError(403, "Only users can change passwords");
     const user = await db.user.findUniqueOrThrow({ where: { id: actor.id } });

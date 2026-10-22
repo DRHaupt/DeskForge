@@ -60,6 +60,8 @@ export type ApiOptions<S extends Schemas> = S & {
   rateLimit?: number;
   /** The service writes its own, richer audit entry; don't add the generic one. */
   skipAudit?: boolean;
+  /** HTTP status for success. Defaults to 201 for POST (creates) and 200 otherwise; use 200 for POST actions. */
+  status?: number;
 };
 
 type RouteCtx = { params: Promise<Record<string, string | string[]>> };
@@ -92,6 +94,11 @@ function errorResponse(err: unknown, requestId: string): NextResponse {
   if (err instanceof ConflictError) return NextResponse.json({ error: err.message, requestId }, { status: 409, headers });
   if (err instanceof z.ZodError)
     return NextResponse.json({ error: "Validation failed", issues: z.flattenError(err), requestId }, { status: 400, headers });
+  // Any other domain error that carries a 4xx status (e.g. WorkflowError).
+  const status = (err as { status?: unknown })?.status;
+  if (err instanceof Error && typeof status === "number" && status >= 400 && status < 500) {
+    return NextResponse.json({ error: err.message, requestId }, { status, headers });
+  }
   if (err instanceof ConfigError) {
     logger.error({ err, requestId }, "configuration error");
     return NextResponse.json({ error: "Server configuration error", requestId }, { status: 500, headers });
@@ -100,6 +107,7 @@ function errorResponse(err: unknown, requestId: string): NextResponse {
   if (prismaCode === "P2002") return NextResponse.json({ error: "Already exists", requestId }, { status: 409, headers });
   if (prismaCode === "P2025") return NextResponse.json({ error: "Not found", requestId }, { status: 404, headers });
   logger.error({ err, requestId }, "unhandled API error");
+  if (process.env.DEBUG_TEST_LOGS) console.error("unhandled API error", err);
   return NextResponse.json({ error: "Internal server error", requestId }, { status: 500, headers });
 }
 
@@ -200,7 +208,7 @@ export function apiRoute<S extends Schemas>(opts: ApiOptions<S>, handler: (ctx: 
         result.headers.set("x-request-id", requestId);
         return result;
       }
-      return NextResponse.json(result ?? { ok: true }, { status: req.method === "POST" ? 201 : 200, headers: { "x-request-id": requestId } });
+      return NextResponse.json(result ?? { ok: true }, { status: opts.status ?? (req.method === "POST" ? 201 : 200), headers: { "x-request-id": requestId } });
     } catch (err) {
       const res = errorResponse(err, requestId);
       if (res.status >= 500) logger.error({ requestId, path: req.nextUrl.pathname, status: res.status }, "api error");
