@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Pencil, Trash2, Eye, EyeOff, GitMerge, Link2, X } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2, Eye, EyeOff, GitMerge, Link2, X, Bug, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -134,6 +134,16 @@ export function TicketWorkspace(props: WorkspaceProps) {
                     )}
                   </>
                 )}
+                {props.itsm.canRaiseProblem && (
+                  <DropdownMenuItem
+                    onSelect={async () => {
+                      const res = (await call(`/api/v1/tickets/${ticket.id}/problem`, {}, "POST", "Problem created and linked")) as { number: string } | null;
+                      if (res) router.push(`/agent/tickets/${res.number}`);
+                    }}
+                  >
+                    <Bug /> Raise a problem
+                  </DropdownMenuItem>
+                )}
                 {perms.delete && (
                   <>
                     <DropdownMenuSeparator />
@@ -167,6 +177,22 @@ export function TicketWorkspace(props: WorkspaceProps) {
             </div>
           )}
         </div>
+
+        {props.itsm.workarounds.map((w) => (
+          <div key={w.id} role="note" className="flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100">
+            <Lightbulb className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <div>
+              <p className="font-medium">
+                Known error{" "}
+                <Link href={`/agent/tickets/${w.number}`} className="underline">
+                  {w.number}
+                </Link>
+                : {w.title}
+              </p>
+              <p className="mt-1 whitespace-pre-wrap">Workaround: {w.workaround}</p>
+            </div>
+          </div>
+        ))}
 
         <Card>
           <CardContent>
@@ -322,8 +348,12 @@ function Links({ ticket, perms, call, onAdd }: WorkspaceProps & { call: (url: st
                 <Link href={`/agent/tickets/${l.ticket.number}`} className="min-w-0 flex-1 truncate hover:underline">
                   <span className="font-mono text-xs">{l.ticket.number}</span> {l.ticket.title}
                 </Link>
+              ) : l.asset ? (
+                <Link href={`/agent/assets/${encodeURIComponent(l.asset.tag)}`} className="min-w-0 flex-1 truncate hover:underline">
+                  {l.asset.tag} · {l.asset.name}
+                </Link>
               ) : (
-                <span className="flex-1 truncate">{l.asset ? `${l.asset.tag} · ${l.asset.name}` : "—"}</span>
+                <span className="flex-1 truncate">—</span>
               )}
               {perms.link && (
                 <button aria-label="Remove link" className="rounded p-0.5 text-muted-foreground hover:bg-accent" onClick={() => call(`/api/v1/tickets/${ticket.id}/links/${l.id}`, undefined, "DELETE", "Link removed")}>
@@ -338,7 +368,7 @@ function Links({ ticket, perms, call, onAdd }: WorkspaceProps & { call: (url: st
   );
 }
 
-function Properties({ ticket, meta, perms, teams, agents, categories, assets, me, features, busy, call }: WorkspaceProps & { busy: boolean; call: (url: string, body?: unknown, method?: string, ok?: string) => Promise<unknown> }) {
+function Properties({ ticket, meta, perms, teams, agents, categories, assets, me, features, itsm, busy, call }: WorkspaceProps & { busy: boolean; call: (url: string, body?: unknown, method?: string, ok?: string) => Promise<unknown> }) {
   const typeMeta = meta.types.find((t) => t.key === ticket.type.key);
   const [fields, setFields] = useState<Record<string, unknown>>(ticket.fields);
   const [fieldsDirty, setFieldsDirty] = useState(false);
@@ -513,7 +543,7 @@ function Properties({ ticket, meta, perms, teams, agents, categories, assets, me
         </Card>
       )}
 
-      {typeMeta?.feature && <ItsmPanel kind={typeMeta.feature === "problemManagement" ? "problem" : "change"} ticket={ticket} meta={meta} perms={perms} patch={patch} />}
+      {typeMeta?.feature && <ItsmPanel kind={typeMeta.feature === "problemManagement" ? "problem" : "change"} ticket={ticket} meta={meta} perms={perms} patch={patch} cabVotes={itsm.cabVotes} />}
 
       <Card className="gap-2 py-4">
         <CardHeader className="px-4">
@@ -578,7 +608,7 @@ function Properties({ ticket, meta, perms, teams, agents, categories, assets, me
 }
 
 /** Problem / change management fields (Phase 6 modules). */
-function ItsmPanel({ kind, ticket, meta, perms, patch }: { kind: "problem" | "change"; ticket: WorkspaceProps["ticket"]; meta: WorkspaceProps["meta"]; perms: WorkspaceProps["perms"]; patch: (b: Record<string, unknown>) => Promise<unknown> }) {
+function ItsmPanel({ kind, ticket, meta, perms, patch, cabVotes }: { kind: "problem" | "change"; ticket: WorkspaceProps["ticket"]; meta: WorkspaceProps["meta"]; perms: WorkspaceProps["perms"]; patch: (b: Record<string, unknown>) => Promise<unknown>; cabVotes: WorkspaceProps["itsm"]["cabVotes"] }) {
   const isProblem = kind === "problem";
   const save = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -640,7 +670,21 @@ function ItsmPanel({ kind, ticket, meta, perms, patch }: { kind: "problem" | "ch
                   <Label htmlFor="i-rb" className="text-xs text-muted-foreground">Rollback plan</Label>
                   <Textarea id="i-rb" name="rollbackPlan" defaultValue={ticket.rollbackPlan ?? ""} />
                 </div>
-                {ticket.cabStatus && ticket.cabStatus !== "NOT_REQUIRED" && <p className="text-xs">CAB: {ticket.cabStatus.toLowerCase()}</p>}
+                {ticket.cabStatus && ticket.cabStatus !== "NOT_REQUIRED" && (
+                  <div className="rounded-md border p-2 text-xs">
+                    <p className="font-medium">CAB review: {ticket.cabStatus.toLowerCase()}</p>
+                    {cabVotes.length > 0 && (
+                      <ul className="mt-1 space-y-0.5">
+                        {cabVotes.map((v) => (
+                          <li key={v.id}>
+                            {v.name}: <span className={v.status === "REJECTED" ? "text-destructive" : v.status === "APPROVED" ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"}>{v.status.toLowerCase()}</span>
+                            {v.comment && <span className="text-muted-foreground"> — “{v.comment}”</span>}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
               </>
             )}
             <Button size="sm" type="submit">Save</Button>

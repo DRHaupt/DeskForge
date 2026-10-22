@@ -82,7 +82,7 @@ async function onEnterAwaiting(event: TicketEvent, states: NonNullable<ReturnTyp
   }
 
   const approvers = await cabApprovers([event.actor.userId, ticket.createdById]);
-  await db.ticket.update({ where: { id: ticket.id }, data: { cabStatus: ApprovalStatus.PENDING } });
+  await db.ticket.update({ where: { id: ticket.id }, data: { cabStatus: approvers.length ? ApprovalStatus.PENDING : ApprovalStatus.NOT_REQUIRED } });
   if (!approvers.length) {
     await systemNote(ticket.id, "<p>No CAB members are configured, so a team lead or admin needs to approve this change by hand.</p>");
     await db.approval.updateMany({ where: { ticketId: ticket.id, kind: ApprovalKind.CHANGE_CAB, status: ApprovalStatus.PENDING }, data: { status: ApprovalStatus.NOT_REQUIRED } });
@@ -158,8 +158,8 @@ onTicketEvent(async (event) => {
   try {
     if (to === states.awaiting && from !== states.awaiting) {
       await onEnterAwaiting(event, states);
-    } else if (from === states.awaiting && event.actor.kind !== "system" && ticket.cabStatus === ApprovalStatus.PENDING) {
-      // Moved on by hand (e.g. rejected by a lead, or no CAB members): close the open votes.
+    } else if (from === states.awaiting && ticket.cabStatus === ApprovalStatus.PENDING) {
+      // Moved on without a CAB decision (rejected by a lead, an automation, no CAB members): close the open votes.
       await db.approval.updateMany({ where: { ticketId: event.ticketId, kind: ApprovalKind.CHANGE_CAB, status: ApprovalStatus.PENDING }, data: { status: ApprovalStatus.NOT_REQUIRED } });
       await db.ticket.update({ where: { id: event.ticketId }, data: { cabStatus: to === states.approved ? ApprovalStatus.APPROVED : to === states.rejected ? ApprovalStatus.REJECTED : ApprovalStatus.NOT_REQUIRED } });
     }

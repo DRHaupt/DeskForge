@@ -8,6 +8,7 @@ import { db } from "@/server/db";
 import { serializeTicket, serializeTimeline } from "@/server/serialize";
 import { requireAgent } from "@/server/session";
 import { agentUserWhere, getTicket, getTimeline } from "@/server/services/tickets";
+import { workaroundsFor } from "@/server/services/problems";
 import { TicketWorkspace } from "./ticket-workspace";
 
 export async function generateMetadata({ params }: { params: Promise<{ number: string }> }): Promise<Metadata> {
@@ -33,6 +34,13 @@ export default async function TicketPage({ params }: { params: Promise<{ number:
     cfg.features.assets ? db.asset.findMany({ where: { deletedAt: null }, select: { id: true, tag: true, name: true }, orderBy: { tag: "asc" }, take: 500 }) : Promise.resolve([]),
     db.cannedResponse.findMany({ where: { OR: [{ isShared: true }, { ownerId: actor.id }] }, select: { id: true, name: true, body: true, actions: true }, orderBy: { name: "asc" } }),
   ]);
+  const typeCfg = cfg.ticketTypes.find((t) => t.key === ticket.type.key);
+  const [workarounds, cabVotes] = await Promise.all([
+    cfg.features.problemManagement && !typeCfg?.feature ? workaroundsFor(ticket.id) : Promise.resolve([]),
+    typeCfg?.feature === "changeManagement"
+      ? db.approval.findMany({ where: { ticketId: ticket.id, kind: "CHANGE_CAB", status: { not: "NOT_REQUIRED" } }, include: { approver: { select: { name: true } } }, orderBy: { createdAt: "asc" } })
+      : Promise.resolve([]),
+  ]);
 
   return (
     <TicketWorkspace
@@ -56,6 +64,11 @@ export default async function TicketPage({ params }: { params: Promise<{ number:
       assets={assets.map((a) => ({ id: a.id, label: `${a.tag} · ${a.name}` }))}
       canned={JSON.parse(JSON.stringify(canned))}
       features={{ problem: cfg.features.problemManagement, change: cfg.features.changeManagement, assets: cfg.features.assets }}
+      itsm={{
+        workarounds: workarounds.map((w) => ({ id: w.id, number: w.number, title: w.title, workaround: w.workaround })),
+        cabVotes: cabVotes.map((v) => ({ id: v.id, name: v.approver.name, status: v.status, comment: v.comment, decidedAt: v.decidedAt?.toISOString() ?? null })),
+        canRaiseProblem: cfg.features.problemManagement && !typeCfg?.feature && can(actor, "problem.manage"),
+      }}
     />
   );
 }

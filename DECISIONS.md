@@ -414,3 +414,70 @@ A canned response is reply text with `{{requester.name}}` and
 (status, priority, tag, team, assign to me) applied after the reply is sent,
 as the agent, so the agent's own permissions limit what a macro can do. Shared
 responses need `canned.manage`; personal ones belong to their author.
+
+## Phase 6 — ITSM extras
+
+### D-049 · CAB states come from the workflow, not hard-coded keys
+For the change ticket type, the first state in the `pending` category is
+where changes wait for the CAB. From there, the first transition into an
+`open` state counts as approval and the first into a `closed` state counts as
+rejection. Businesses can rename or add states freely.
+
+### D-050 · CAB rules
+- A risk level must be set before a change is submitted. It can't be changed
+  while votes are open.
+- Risk levels not in `itsm.cabRequiredForRisk` are approved automatically
+  (standard changes). Unknown risk always goes to the CAB.
+- Voters are `itsm.cabMembers`, or, if none are listed, everyone holding
+  `change.approve`. The person submitting the change and its creator don't
+  vote on it unless nobody else can. Named CAB members can vote even without
+  `change.approve`, matching how catalog approvers work.
+- Any rejection rejects the change. `cabQuorum` approvals approve it (capped
+  at the number of voters). The change then moves on automatically as the
+  system.
+- While votes are open, nobody can move the change to the approved state by
+  hand, and the button is hidden. A lead can still reject it by hand, and
+  the open votes are then closed.
+- If no voters exist at all, the change waits for a team lead or admin to
+  approve it by hand, and a note says so.
+
+### D-051 · Problems
+Incidents point at their problem with a `CAUSED_BY` link. "Raise a problem"
+creates the problem from an incident and links them in one step. Ticking
+*known error* adds an internal note with the workaround to every open linked
+incident and shows the workaround as a banner on them. Resolving the problem
+notes it on the incidents. Incidents are not closed automatically, because
+their requesters may still need help.
+
+### D-052 · Module permissions
+Creating, editing or moving problem tickets needs `problem.manage`, and the
+same for change tickets with `change.manage`. Ordinary ticket permissions
+aren't enough, so a requester can never raise a change through the API.
+
+### D-053 · Assets
+Asset types are free text (with suggestions from existing values) rather than
+config, because they change too often to need a deploy. Statuses are a fixed
+list: in stock, in use, in repair, retired, disposed. Deleting an asset is a
+soft delete that renames the tag so it can be reused. Requesters only ever see
+assets assigned to them, and can only attach those to their tickets (through
+`assetIds` or an `asset` custom field).
+
+### D-054 · CSV import
+Rows are matched by tag (insert or update). Header names are matched loosely
+("Asset Tag", "Serial Number", "Assigned To" and so on). Unknown columns are
+kept as asset attributes. Owners are matched by email and organizations by
+slug or name. Bad rows are skipped and reported with their line number. A dry
+run previews the result. Each import is limited to 5,000 rows and 5 MB.
+Exported cells starting with `= + - @` get a leading `'` to prevent
+spreadsheet formula injection.
+
+### D-055 · Agile boards
+Boards are defined in config (`boards`), each column grouping workflow
+states. Dropping a card in another column performs a normal workflow
+transition to that column's first state, so workflow roles still apply. A
+transition that needs a comment is refused on the board; use the ticket page
+for it. Ordering uses a floating-point `boardRank` that doesn't
+touch `updatedAt`, so reordering doesn't affect SLAs, sorting or automations.
+WIP limits are shown but not enforced. Finished cards drop off after 30 days.
+Every card also has a "Move to" menu as a keyboard-accessible alternative to
+drag and drop.

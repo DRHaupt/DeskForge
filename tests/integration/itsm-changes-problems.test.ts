@@ -125,3 +125,14 @@ describe("problem management", () => {
     expect(await listKnownErrors(emma, { includeResolved: false })).toEqual([]);
   });
 });
+
+describe("CAB bookkeeping", () => {
+  it("closes open votes when a change leaves review without a CAB decision", async () => {
+    const id = await newChange("high", "Replace core switch");
+    await transitionTicket(emma, id, { to: "awaiting_approval" });
+    await transitionTicket(dana, id, { to: "rejected", comment: "Not this quarter" });
+    const t = await getTicket(emma, id);
+    expect(t.cabStatus).toBe("REJECTED");
+    expect(await db.approval.count({ where: { ticketId: id, status: "PENDING" } })).toBe(0);
+  });
+});

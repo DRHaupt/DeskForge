@@ -4,6 +4,7 @@
  * Every function takes an Actor and enforces permissions and workflow rules.
  */
 import { z } from "zod";
+import { cabStates } from "@/core/itsm/cab";
 import { getConfig } from "@/core/config/loader";
 import { activeTicketTypes, getTicketTypeConfig, priorityFromMatrix } from "@/core/config/helpers";
 import type { BusinessConfig, FieldConfig, TicketTypeConfig } from "@/core/config/schema";
@@ -392,11 +393,14 @@ export async function getTimeline(actor: Actor, ticket: TicketDetail): Promise<T
   return items.sort((a, b) => a.at.getTime() - b.at.getTime());
 }
 
-export function transitionsFor(actor: Actor, ticket: { status: string; requesterId: string; type: { key: string } }) {
+export function transitionsFor(actor: Actor, ticket: { status: string; requesterId: string; type: { key: string }; cabStatus?: string }) {
   const typeCfg = getTicketTypeConfig(getConfig(), ticket.type.key);
   if (!typeCfg) return [];
   if (actor.kind !== "system" && !can(actor, "ticket.transition") && actorUserId(actor) !== ticket.requesterId) return [];
-  return availableTransitions(typeCfg, ticket.status, workflowActorFor(actor, ticket));
+  const all = availableTransitions(typeCfg, ticket.status, workflowActorFor(actor, ticket));
+  // While the CAB is voting, approval only happens through the votes.
+  const cab = ticket.cabStatus === "PENDING" ? cabStates(typeCfg) : null;
+  return cab && ticket.status === cab.awaiting ? all.filter((t) => t.to !== cab.approved) : all;
 }
 
 // ─── List ──────────────────────────────────────────────────────────────────

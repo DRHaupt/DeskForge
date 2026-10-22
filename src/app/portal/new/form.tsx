@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 
 const sel = "h-9 w-full rounded-md border border-input bg-background px-3 text-sm";
 
-export function PortalNewForm({ types, initialType, impact, urgency, suggest }: { types: TicketMeta["types"]; initialType?: string; impact: TicketMeta["impact"]; urgency: TicketMeta["urgency"]; suggest: boolean }) {
+export function PortalNewForm({ types, initialType, impact, urgency, suggest, assets }: { types: TicketMeta["types"]; initialType?: string; impact: TicketMeta["impact"]; urgency: TicketMeta["urgency"]; suggest: boolean; assets?: { id: string; label: string }[] }) {
   const router = useRouter();
   const [typeKey, setTypeKey] = useState(initialType ?? types[0]?.key ?? "");
   const type = types.find((t) => t.key === typeKey);
@@ -28,6 +28,7 @@ export function PortalNewForm({ types, initialType, impact, urgency, suggest }: 
   const [files, setFiles] = useState<Uploaded[]>([]);
   const [articles, setArticles] = useState<{ slug: string; title: string }[]>([]);
   const [pending, setPending] = useState(false);
+  const [deviceId, setDeviceId] = useState("");
 
   // Suggest articles while the requester types the subject.
   useEffect(() => {
@@ -50,6 +51,7 @@ export function PortalNewForm({ types, initialType, impact, urgency, suggest }: 
   }, [title, description, suggest]);
 
   if (!type) return <p className="mt-6 text-muted-foreground">There&apos;s nothing to submit here yet.</p>;
+  const hasAssetField = type.fields.some((f) => f.type === "asset");
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -66,6 +68,7 @@ export function PortalNewForm({ types, initialType, impact, urgency, suggest }: 
           urgency: f.get("urgency") || undefined,
           fields: Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== null && v !== "" && v !== undefined)),
           attachmentIds: files.map((x) => x.id),
+          assetIds: deviceId && !hasAssetField ? [deviceId] : [],
         },
       });
       toast.success("Thanks — we've got your request");
@@ -124,7 +127,20 @@ export function PortalNewForm({ types, initialType, impact, urgency, suggest }: 
       </div>
       {type.fields.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2">
-          <FieldInputs fields={type.fields} values={fields} errors={errors} idPrefix="pf" onChange={(k, v) => setFields((s) => ({ ...s, [k]: v }))} />
+          <FieldInputs fields={type.fields} values={fields} errors={errors} idPrefix="pf" onChange={(k, v) => setFields((s) => ({ ...s, [k]: v }))} assets={assets ?? []} />
+        </div>
+      )}
+      {assets && assets.length > 0 && !hasAssetField && (
+        <div className="space-y-1.5 sm:max-w-sm">
+          <Label htmlFor="pn-device">Which of your devices is affected? (optional)</Label>
+          <select id="pn-device" className={sel} value={deviceId} onChange={(e) => setDeviceId(e.target.value)}>
+            <option value="">None / not sure</option>
+            {assets.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.label}
+              </option>
+            ))}
+          </select>
         </div>
       )}
       <div className="grid gap-4 sm:grid-cols-2">

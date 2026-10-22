@@ -56,6 +56,10 @@ export function toCsv(header: string[], rows: unknown[][]): string {
 export const ASSET_STATUSES = ["in_stock", "in_use", "in_repair", "retired", "disposed"] as const;
 export type AssetStatus = (typeof ASSET_STATUSES)[number];
 
+export function assetStatusLabel(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, " ");
+}
+
 /** Accepted header spellings → field. Matching ignores case, spaces, dashes and underscores. */
 const HEADER_ALIASES: Record<string, string> = {
   tag: "tag", assettag: "tag", asset: "tag", id: "tag",

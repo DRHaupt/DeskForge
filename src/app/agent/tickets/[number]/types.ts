@@ -65,4 +65,11 @@ export type WorkspaceProps = {
   assets: { id: string; label: string }[];
   canned: { id: string; name: string; body: string; actions: unknown }[];
   features: { problem: boolean; change: boolean; assets: boolean };
+  itsm: {
+    /** Known-error workarounds from problems this ticket is linked to. */
+    workarounds: { id: string; number: string; title: string; workaround: string | null }[];
+    /** CAB votes on a change. */
+    cabVotes: { id: string; name: string; status: string; comment: string | null; decidedAt: string | null }[];
+    canRaiseProblem: boolean;
+  };
 };
