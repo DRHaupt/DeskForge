@@ -3,7 +3,7 @@ import type { BusinessConfig } from "../../src/core/config/schema";
 import type { Db } from "../../src/server/db";
 import { systemActor } from "../../src/core/rbac/actor";
 import { loadUserActor } from "../../src/server/actor";
-import { createAutomation } from "../../src/server/automation";
+import { createAutomation, runScheduledAutomations } from "../../src/server/automation";
 import { createCanned } from "../../src/server/services/canned";
 
 function stateFor(cfg: BusinessConfig, category: string): string | undefined {
@@ -47,6 +47,11 @@ export async function seedAutomation(db: Db, cfg: BusinessConfig): Promise<void>
       actions: [{ type: "set_status", value: closed }],
     });
   }
+
+  // Apply time-based rules to the demo data now, while side effects are off.
+  // Otherwise the worker's first tick would close old demo tickets and email their (fake) requesters.
+  const ran = await runScheduledAutomations();
+  for (const r of ran) if (r.matched) console.log(`  automation "${r.automation}": ${r.matched} demo tickets`);
 
   const agent = await db.user.findFirst({ where: { roles: { some: { role: { key: { in: ["team_lead", "admin"] } } } } }, orderBy: { createdAt: "asc" } });
   if (!agent || (await db.cannedResponse.count())) return;
