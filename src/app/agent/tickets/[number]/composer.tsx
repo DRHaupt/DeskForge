@@ -20,6 +20,7 @@ export function Composer({ ticket, perms, canned }: Pick<WorkspaceProps, "ticket
   const [html, setHtml] = useState("");
   const [files, setFiles] = useState<Uploaded[]>([]);
   const [status, setStatus] = useState("");
+  const [macroId, setMacroId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   // r = reply, n = internal note (when not typing somewhere else)
@@ -54,10 +55,14 @@ export function Composer({ ticket, perms, canned }: Pick<WorkspaceProps, "ticket
       } else {
         await api(`/api/v1/tickets/${ticket.id}/comments`, { body: { body, visibility: mode, attachmentIds: files.map((f) => f.id) } });
       }
+      if (macroId) {
+        await api(`/api/v1/tickets/${ticket.id}/macro`, { body: { cannedId: macroId } }).catch((e) => toast.error(`Macro: ${(e as Error).message}`));
+      }
       editor.current?.clear();
       setHtml("");
       setFiles([]);
       setStatus("");
+      setMacroId(null);
       toast.success(mode === "PUBLIC" ? "Reply sent" : "Note added");
       router.refresh();
     } catch (err) {
@@ -101,7 +106,11 @@ export function Composer({ ticket, perms, canned }: Pick<WorkspaceProps, "ticket
             value=""
             onChange={(e) => {
               const c = canned.find((x) => x.id === e.target.value);
-              if (c) setHtml((editor.current?.getHTML() ?? "") + c.body.replace(/\{\{\s*requester\.name\s*\}\}/g, ticket.requester.name.split(" ")[0]!).replace(/\{\{\s*ticket\.number\s*\}\}/g, ticket.number));
+              if (!c) return;
+              setHtml((editor.current?.getHTML() ?? "") + c.body.replace(/\{\{\s*requester\.(first_)?name\s*\}\}/g, ticket.requester.name.split(" ")[0]!).replace(/\{\{\s*ticket\.number\s*\}\}/g, ticket.number));
+              const acts = Array.isArray(c.actions) ? c.actions : [];
+              setMacroId(acts.length ? c.id : null);
+              if (acts.length) toast.info(`Macro "${c.name}" will also run its actions when you send.`);
             }}
           >
             <option value="">Canned response…</option>

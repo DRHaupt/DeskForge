@@ -6,6 +6,7 @@ import { createArticle } from "../../src/server/services/kb";
 import { submitCatalogRequest } from "../../src/server/services/catalog";
 import { randomToken } from "../../src/server/crypto";
 import { seedItsm } from "./itsm";
+import { seedAutomation } from "./automation";
 
 type Art = { title: string; category: string; tags: string[]; body: string; visibility?: "PUBLIC" | "INTERNAL"; views: number };
 
@@ -86,6 +87,7 @@ export async function seedExtras(db: Db, cfg: BusinessConfig): Promise<void> {
   if (cfg.features.knowledgeBase) await seedKb(db, cfg);
   if (cfg.features.serviceCatalog) await seedCatalog(db, cfg);
   if (cfg.features.csat) await seedCsat(db);
+  await seedAutomation(db, cfg);
   await seedItsm(db, cfg);
 }
 

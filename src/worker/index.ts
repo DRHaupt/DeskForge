@@ -66,6 +66,8 @@ function repeatingJobs(): Record<string, number> {
     "sla-sweep": 60_000,
     // Each mailbox has its own pollSeconds; this tick just checks which are due.
     "imap-poll": 15_000,
+    // Scheduled automations each have their own interval; this tick checks which are due.
+    "automation-schedule": 60_000,
   };
 }
 

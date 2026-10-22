@@ -360,3 +360,57 @@ A global side-effects switch (`src/server/side-effects.ts`) stops queued jobs
 and outgoing email while demo data is loaded. Emails generated during seeding
 are recorded as `SKIPPED` ("demo data") so the email log still shows what
 would have been sent.
+
+## Phase 5 — Automation & integrations
+
+### D-042 · Automations run through the normal services
+Rules are trigger → conditions (`all` + `any`) → actions. Actions run as a
+system actor (`automation:<name>`), through the same services as people, so
+workflow transitions, validation and audit all apply. If an action fails (for
+example a transition the workflow doesn't allow), the rule's remaining actions
+are skipped, and the run is recorded as failed with the reason. Other rules
+still run.
+
+### D-043 · Automation loops are capped
+Changes made by an automation emit events again, so rules can chain. Each event
+carries a depth, and nothing runs past depth 3 (`MAX_AUTOMATION_DEPTH`).
+
+### D-044 · Scheduled automations
+`schedule` rules use a simple `every Nm` interval (5–1440 minutes) instead of
+cron. The worker checks due rules every minute and evaluates them against
+non-deleted tickets updated in the last 180 days (at most 1000 per run), with
+time-based facts such as `hoursInStatus` and `hoursSinceUpdated`. A rule acts
+on a given ticket at most once until that ticket changes again.
+
+### D-045 · Webhooks
+Payloads are signed as `X-DeskForge-Signature: t=<unix>,v1=<HMAC-SHA256(secret,
+"t.body")>`, in the same style as common payment providers, so receivers can
+reject replays. Deliveries are retried up to 8 times with exponential backoff
+(starting at 30 s and doubling each time), and every attempt is kept in the delivery log
+and can be redelivered. To stop SSRF, URLs that resolve to private, loopback,
+link-local or metadata addresses are rejected at save time and again at send
+time, unless `WEBHOOK_ALLOW_PRIVATE=true` is set (for on-prem receivers).
+The signing secret (`whsec_…`) is shown once when the webhook is created and
+only a preview after that. It's stored as-is because it's needed to sign
+requests.
+
+### D-046 · API keys
+Keys look like `dfk_<prefix>_<secret>`, and only a SHA-256 hash is stored. The
+full key is shown once. A key's effective permissions are its scopes
+intersected with its creator's *current* permissions, so demoting or disabling
+a user immediately narrows or disables their keys. Keys can expire and record
+when they were last used. API-key requests skip the CSRF origin check (no
+cookies are involved) but are rate-limited per key.
+
+### D-047 · OpenAPI is generated from the same Zod schemas
+`/api/v1/openapi.json` is built at request time from a registry of endpoints
+whose request bodies are the Zod schemas the routes validate with
+(`z.toJSONSchema`), so the documentation can't drift from validation. `/api-docs`
+renders a readable reference from the same registry.
+
+### D-048 · Canned responses and macros
+A canned response is reply text with `{{requester.name}}` and
+`{{ticket.number}}` placeholders. A *macro* is a canned response with actions
+(status, priority, tag, team, assign to me) applied after the reply is sent,
+as the agent, so the agent's own permissions limit what a macro can do. Shared
+responses need `canned.manage`; personal ones belong to their author.

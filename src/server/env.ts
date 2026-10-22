@@ -36,6 +36,8 @@ const envSchema = z.object({
   SMTP_SECURE: bool,
   INBOUND_EMAIL_SECRET: z.string().optional(),
 
+  /** Allow webhooks to private/internal addresses (off by default to prevent SSRF). */
+  WEBHOOK_ALLOW_PRIVATE: bool,
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(300),
   SEED_ADMIN_EMAIL: z.string().optional(),
   SEED_ADMIN_PASSWORD: z.string().optional(),

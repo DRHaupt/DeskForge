@@ -21,6 +21,7 @@ export const NAV: NavSection[] = [
       { href: "/agent/search", label: "Search", icon: "list", permissions: ["ticket.view_team", "ticket.view_all"] },
       { href: "/agent/approvals", label: "Approvals", icon: "check", permissions: ["catalog.approve", "change.approve"] },
       { href: "/agent/kb", label: "Knowledge base", icon: "book", permissions: ["kb.author", "kb.view_internal"], feature: "knowledgeBase" },
+      { href: "/agent/canned", label: "Canned responses", icon: "message", permissions: ["ticket.reply"] },
     ],
   },
   {
@@ -31,6 +32,9 @@ export const NAV: NavSection[] = [
       { href: "/admin/teams", label: "Teams", icon: "users-round", permissions: ["team.manage"] },
       { href: "/admin/organizations", label: "Organizations", icon: "building", permissions: ["org.view"] },
       { href: "/admin/catalog", label: "Service catalog", icon: "bag", permissions: ["catalog.manage"], feature: "serviceCatalog" },
+      { href: "/admin/automations", label: "Automations", icon: "zap", permissions: ["automation.manage"] },
+      { href: "/admin/webhooks", label: "Webhooks", icon: "webhook", permissions: ["webhook.manage"] },
+      { href: "/admin/api-keys", label: "API keys", icon: "key", permissions: ["apikey.manage"] },
       { href: "/admin/email", label: "Email log", icon: "message", permissions: ["config.view"] },
       { href: "/admin/audit", label: "Audit log", icon: "scroll", permissions: ["audit.view"] },
     ],
