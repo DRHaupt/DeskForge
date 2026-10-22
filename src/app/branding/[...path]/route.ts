@@ -15,8 +15,8 @@ const TYPES: Record<string, string> = {
 
 export async function GET(_req: Request, ctx: { params: Promise<{ path: string[] }> }) {
   const { path: parts } = await ctx.params;
-  const root = path.resolve(process.env.BRANDING_DIR ?? "./branding");
-  const file = path.resolve(root, ...parts);
+  const root = path.resolve(/*turbopackIgnore: true*/ process.env.BRANDING_DIR ?? "./branding");
+  const file = path.resolve(/*turbopackIgnore: true*/ root, ...parts);
   const type = TYPES[path.extname(file).toLowerCase()];
   if (!file.startsWith(root + path.sep) || !type) return new NextResponse("Not found", { status: 404 });
   try {

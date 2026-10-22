@@ -51,7 +51,7 @@ export function parseBusinessConfigYaml(text: string, source = "business config"
 }
 
 export function resolveConfigPath(env: NodeJS.ProcessEnv = process.env): string {
-  return path.resolve(env.BUSINESS_CONFIG_PATH ?? "business.config.yaml");
+  return path.resolve(/*turbopackIgnore: true*/ env.BUSINESS_CONFIG_PATH ?? "business.config.yaml");
 }
 
 export function loadBusinessConfigFromFile(filePath: string): BusinessConfig {
