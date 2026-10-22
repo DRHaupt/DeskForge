@@ -1,0 +1,116 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Brand colors (--brand-primary, --brand-accent, --brand-primary-foreground) are
+ * injected at runtime by the root layout from business.config.yaml.
+ * Nothing business-specific is hard-coded here.
+ */
+:root {
+  --radius: 0.5rem;
+  --background: #ffffff;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: var(--brand-primary, #2563eb);
+  --primary-foreground: var(--brand-primary-foreground, #ffffff);
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #475569;
+  --accent: #f1f5f9;
+  --accent-foreground: #0f172a;
+  --brand: var(--brand-accent, #0ea5e9);
+  --destructive: #dc2626;
+  --border: #e2e8f0;
+  --input: #cbd5e1;
+  --ring: var(--brand-primary, #2563eb);
+  --sidebar: #f8fafc;
+  --sidebar-foreground: #0f172a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --background: #0b1120;
+    --foreground: #e2e8f0;
+    --card: #111827;
+    --card-foreground: #e2e8f0;
+    --popover: #111827;
+    --popover-foreground: #e2e8f0;
+    --secondary: #1e293b;
+    --secondary-foreground: #e2e8f0;
+    --muted: #1e293b;
+    --muted-foreground: #94a3b8;
+    --accent: #1e293b;
+    --accent-foreground: #e2e8f0;
+    --border: #1f2937;
+    --input: #334155;
+    --sidebar: #0f172a;
+    --sidebar-foreground: #e2e8f0;
+  }
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-brand: var(--brand);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  /* Visible keyboard focus everywhere. */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+}
+
+/* Rich text rendered from sanitized HTML (comments, articles). */
+.prose-df {
+  @apply text-sm leading-6;
+}
+.prose-df p { @apply my-2; }
+.prose-df a { @apply text-primary underline underline-offset-2; }
+.prose-df ul { @apply list-disc pl-6 my-2; }
+.prose-df ol { @apply list-decimal pl-6 my-2; }
+.prose-df h1 { @apply text-xl font-semibold mt-4 mb-2; }
+.prose-df h2 { @apply text-lg font-semibold mt-4 mb-2; }
+.prose-df h3 { @apply font-semibold mt-3 mb-1; }
+.prose-df blockquote { @apply border-l-4 pl-3 text-muted-foreground my-2; }
+.prose-df code { @apply rounded bg-muted px-1 py-0.5 text-[0.85em]; }
+.prose-df pre { @apply rounded bg-muted p-3 overflow-x-auto my-2; }
+.prose-df pre code { @apply bg-transparent p-0; }
+.prose-df table { @apply w-full border-collapse my-2; }
+.prose-df th, .prose-df td { @apply border px-2 py-1 text-left; }
+.prose-df img { @apply max-w-full h-auto rounded; }
+.prose-df .mention { @apply rounded bg-primary/10 px-1 text-primary font-medium; }

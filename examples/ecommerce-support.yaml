@@ -1,0 +1,224 @@
+# DeskForge example: customer support for an online store.
+#
+# - Customers sign up themselves on the portal or simply email support
+# - Order issues, returns, product questions — no ITIL problem/change management
+# - Extended support hours (7 days), CSAT survey after every resolved ticket
+# - Google sign-in for the support team
+#
+# Copy with: scripts/new-business.sh my-store ecommerce-support
+version: 1
+
+branding:
+  name: Fernleaf Home Goods
+  shortName: Fernleaf
+  logo: logo.svg
+  favicon: favicon.svg
+  colors:
+    primary: "#15803d"
+    accent: "#e11d48"
+  supportEmail: care@fernleaf-home.example
+  portalWelcome: |
+    Questions about an order, a return or one of our products? Most answers are
+    in the help center below. Can't find it? Send us a message — we reply within a day.
+  footer: "Fernleaf Home Goods · Customer Care, 7 days a week"
+
+locale:
+  timezone: Europe/London
+  language: en
+  dateFormat: dd/MM/yyyy
+  timeFormat: HH:mm
+  weekStartsOn: mon
+  businessHours:
+    mon: [{ start: "08:00", end: "20:00" }]
+    tue: [{ start: "08:00", end: "20:00" }]
+    wed: [{ start: "08:00", end: "20:00" }]
+    thu: [{ start: "08:00", end: "20:00" }]
+    fri: [{ start: "08:00", end: "20:00" }]
+    sat: [{ start: "09:00", end: "17:00" }]
+    sun: [{ start: "10:00", end: "16:00" }]
+  holidays:
+    - { date: "2026-12-25", name: Christmas Day }
+    - { date: "2026-12-26", name: Boxing Day }
+    - { date: "2027-01-01", name: New Year's Day }
+
+auth:
+  local:
+    enabled: true
+    passwordPolicy: { minLength: 10, requireUppercase: false, requireLowercase: true, requireNumber: true }
+  oidc:
+    - id: google
+      type: google
+      label: Staff sign-in with Google
+      envPrefix: OIDC_GOOGLE
+      autoProvision: false
+      defaultRole: agent
+      allowedDomains: [fernleaf-home.example]
+  sessionMaxAgeHours: 72
+
+portal:
+  requestersSeeOrgTickets: false
+  allowRequesterClose: true
+  requesterCloseStatus: solved
+  reopenOnReply: true
+  reopenStatus: open
+  suggestArticles: true
+
+features:
+  knowledgeBase: true
+  serviceCatalog: false
+  assets: false
+  problemManagement: false
+  changeManagement: false
+  agileBoards: false
+  csat: true
+  publicSignup: true
+
+priorities:
+  levels:
+    - { key: urgent, name: Urgent, color: "#dc2626" }
+    - { key: high, name: High, color: "#ea580c" }
+    - { key: normal, name: Normal, color: "#2563eb" }
+    - { key: low, name: Low, color: "#64748b" }
+  impact:
+    - { key: many_orders, name: Many customers / orders }
+    - { key: single_order, name: A single order }
+  urgency:
+    - { key: high, name: Time-sensitive (delivery, event, payment) }
+    - { key: normal, name: Normal }
+  matrix:
+    many_orders: { high: urgent, normal: high }
+    single_order: { high: high, normal: normal }
+  default: normal
+
+sla:
+  enabled: true
+  pauseStatuses: [awaiting_customer, awaiting_carrier]
+  warningPercent: 80
+  policies:
+    - { key: urgent, name: Urgent, priorities: [urgent], firstResponse: 1h, resolution: 8h, calendar: always }
+    - { key: high, name: High, priorities: [high], firstResponse: 2h, resolution: 1d }
+    - { key: standard, name: Standard, priorities: [normal, low], firstResponse: 8h, resolution: 3d }
+  escalation:
+    notifyOnWarning: true
+    notifyOnBreach: true
+    reassignOnBreach: false
+    raisePriorityOnBreach: true
+
+teams:
+  - key: customer_care
+    name: Customer Care
+    description: All incoming customer conversations.
+    email: care@fernleaf-home.example
+    assignment: load_balanced
+    members: [olivia.hart@fernleaf-home.example, ben.adeyemi@fernleaf-home.example, chloe.martin@fernleaf-home.example]
+    leads: [hannah.price@fernleaf-home.example]
+    escalateTo: { team: escalations }
+  - key: returns
+    name: Returns & Refunds
+    email: returns@fernleaf-home.example
+    assignment: round_robin
+    members: [ben.adeyemi@fernleaf-home.example, isaac.wood@fernleaf-home.example]
+    leads: [hannah.price@fernleaf-home.example]
+    escalateTo: { team: escalations }
+  - key: escalations
+    name: Escalations
+    description: Senior team for complaints and high-value orders.
+    assignment: manual
+    members: [hannah.price@fernleaf-home.example]
+    leads: [hannah.price@fernleaf-home.example]
+
+categories:
+  - key: orders
+    name: Orders
+    children:
+      - { key: where_is_my_order, name: Where is my order? }
+      - { key: change_order, name: Change or cancel }
+      - { key: missing_item, name: Missing item }
+  - key: delivery
+    name: Delivery
+    children:
+      - { key: damaged, name: Arrived damaged }
+      - { key: late, name: Late delivery }
+  - key: returns
+    name: Returns & refunds
+    children:
+      - { key: start_return, name: Start a return }
+      - { key: refund_status, name: Refund status }
+  - key: products
+    name: Products
+    children:
+      - { key: care, name: Care instructions }
+      - { key: sizing, name: Sizing & dimensions }
+      - { key: stock, name: Stock & restock }
+  - key: account
+    name: Account & payment
+
+ticketTypes:
+  - key: question
+    name: Question
+    description: Ask us anything about products, delivery or your account.
+    prefix: QST
+    numberPadding: 7
+    defaultPriority: normal
+    defaultTeam: customer_care
+    fields:
+      - { key: order_number, label: Order number (if any), type: text }
+    workflow: &store_workflow
+      initial: new
+      states:
+        - { key: new, name: New, category: new, color: "#6366f1" }
+        - { key: open, name: Open, category: open, portalName: We're on it, color: "#2563eb" }
+        - { key: awaiting_customer, name: Awaiting Customer, category: pending, pausesSla: true, portalName: Waiting for your reply, color: "#d97706" }
+        - { key: awaiting_carrier, name: Awaiting Carrier, category: pending, portalName: Checking with the courier, color: "#b45309" }
+        - { key: solved, name: Solved, category: resolved, color: "#16a34a" }
+        - { key: closed, name: Closed, category: closed, color: "#475569" }
+      transitions:
+        - { from: [new, awaiting_customer, awaiting_carrier, solved], to: open, name: Open, roles: [agent, team_lead, admin] }
+        - { from: [new, open], to: awaiting_customer, name: Ask customer, roles: [agent, team_lead, admin] }
+        - { from: [new, open], to: awaiting_carrier, name: Ask carrier, roles: [agent, team_lead, admin] }
+        - { from: [awaiting_customer, solved], to: open, name: Reply, roles: [requester] }
+        - { from: [new, open, awaiting_customer, awaiting_carrier], to: solved, name: Solve, roles: [agent, team_lead, admin, requester] }
+        - { from: [solved], to: closed, name: Close, roles: [agent, team_lead, admin] }
+
+  - key: order_issue
+    name: Order Problem
+    description: Missing, damaged, wrong or late items.
+    prefix: ORD
+    defaultPriority: high
+    defaultTeam: customer_care
+    fields:
+      - { key: order_number, label: Order number, type: text, required: true, helpText: "Starts with FL-, e.g. FL-104233" }
+      - { key: issue_kind, label: What went wrong?, type: dropdown, required: true, options: [Item missing, Item damaged, Wrong item, Late delivery, Other] }
+      - { key: delivery_date, label: Delivery date, type: date }
+    workflow: *store_workflow
+
+  - key: return_request
+    name: Return / Refund
+    description: Send something back or ask about a refund.
+    prefix: RMA
+    defaultPriority: normal
+    defaultTeam: returns
+    fields:
+      - { key: order_number, label: Order number, type: text, required: true }
+      - { key: reason, label: Reason, type: dropdown, required: true, options: [Changed my mind, Doesn't fit, Faulty, Not as described] }
+      - { key: refund_amount, label: Refund amount (GBP), type: number, min: 0, portal: false }
+      - { key: items, label: Which items?, type: textarea, required: true }
+    workflow: *store_workflow
+
+email:
+  enabled: true
+  fromName: Fernleaf Customer Care
+  mailboxes:
+    - { address: care@fernleaf-home.example, team: customer_care, ticketType: question, mode: webhook }
+    - { address: returns@fernleaf-home.example, team: returns, ticketType: return_request, mode: webhook }
+  createUnknownSenders: true
+  ignoreSenders: ["mailer-daemon@*", "no-reply@*", "noreply@*", "*@marketplace-notifications.example"]
+
+csat:
+  sendOn: resolved
+  delayMinutes: 60
+  scale: 5
+  question: How happy are you with the help you got from Fernleaf?
+
+catalog: []
+organizations: []
