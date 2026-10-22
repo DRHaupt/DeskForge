@@ -122,3 +122,44 @@ export function displayValue(f: FieldConfig, value: unknown, lookup?: (id: strin
   if ((f.type === "user" || f.type === "asset") && lookup) return lookup(String(value)) ?? String(value);
   return String(value);
 }
+
+/**
+ * Tickets created indirectly (email, catalog request) can't ask the requester
+ * for the ticket type's own required fields. Fill those with values from
+ * `source` when keys match, otherwise with a neutral placeholder.
+ */
+export function fillRequiredFields(fields: FieldConfig[], source: Record<string, unknown> = {}, today = new Date()): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const f of fields) {
+    const v = source[f.key];
+    if (v !== undefined && v !== null && v !== "") {
+      out[f.key] = v;
+      continue;
+    }
+    if (!f.required) continue;
+    switch (f.type) {
+      case "number":
+        out[f.key] = f.min ?? 0;
+        break;
+      case "dropdown":
+        out[f.key] = f.options![0]!.value;
+        break;
+      case "multiselect":
+        out[f.key] = [f.options![0]!.value];
+        break;
+      case "date":
+        out[f.key] = today.toISOString().slice(0, 10);
+        break;
+      case "checkbox":
+        out[f.key] = false;
+        break;
+      case "user":
+      case "asset":
+        break;
+      default:
+        out[f.key] = "(see description)";
+    }
+  }
+  // Only keep keys the type actually has.
+  return Object.fromEntries(Object.entries(out).filter(([k]) => fields.some((f) => f.key === k)));
+}

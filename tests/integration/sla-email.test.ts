@@ -113,8 +113,10 @@ describe("outbound email", () => {
     const t = await createTicket(requester, { type: "incident", title: "Resolve email" });
     mail.sent.length = 0;
     await transitionTicket(agent, t.id, { to: "resolved", comment: "Replaced the cable" });
-    const toRequester = mail.sent.filter((m) => m.to === "rita@acmedental.example");
+    const toRequester = mail.sent.filter((m) => m.to === "rita@acmedental.example" && !m.subject.startsWith("How did we do"));
     expect(toRequester).toHaveLength(1);
+    // CSAT is on in this config: the survey goes out separately.
+    expect(mail.sent.some((m) => m.subject.startsWith("How did we do") && m.to === "rita@acmedental.example")).toBe(true);
     expect(toRequester[0]!.subject).toMatch(/^Resolved: /);
     expect(toRequester[0]!.html).toContain("Replaced the cable");
   });

@@ -14,11 +14,16 @@ import { db } from "../src/server/db";
 import { hashPassword } from "../src/server/passwords";
 import { demoPeople } from "./seed/people";
 import { seedDemoContent } from "./seed/content";
+import { setSideEffects } from "../src/server/side-effects";
+import { closeQueues } from "../src/server/queue";
+import { getRedis } from "../src/server/redis";
 
 export const DEFAULT_DEMO_PASSWORD = "DeskForge-Demo-2026!";
 const SEED_FLAG = "seed.demo_completed_at";
 
 async function main() {
+  // Demo data must never send email or trigger webhooks.
+  setSideEffects(false);
   const force = process.argv.includes("--force");
   const cfg = getConfig();
   const done = await db.systemSetting.findUnique({ where: { key: SEED_FLAG } });
@@ -71,4 +76,8 @@ main()
     console.error(err);
     process.exitCode = 1;
   })
-  .finally(() => db.$disconnect());
+  .finally(async () => {
+    await closeQueues();
+    await getRedis().quit().catch(() => undefined);
+    await db.$disconnect();
+  });

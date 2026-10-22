@@ -26,3 +26,15 @@ describe("password policy", () => {
     expect(checkPassword("Correct-Horse-9-Battery", policy)).toEqual([]);
   });
 });
+
+import { toPrefixQuery } from "@/server/search/postgres";
+describe("search query building", () => {
+  it("builds safe prefix queries", () => {
+    expect(toPrefixQuery("VPN conn")).toBe("vpn:* & conn:*");
+    expect(toPrefixQuery("a'); DROP TABLE x; --")).toBe("a:* & drop:* & table:* & x:*");
+    expect(toPrefixQuery("   ")).toBeNull();
+  });
+  it("suggestion mode ORs meaningful words", () => {
+    expect(toPrefixQuery("VPN keeps asking for my password", "any")).toBe("vpn:* | asking:* | password:*");
+  });
+});

@@ -11,7 +11,8 @@ export type ArticleHit = { id: string; slug: string; title: string; snippet: str
 
 export interface SearchProvider {
   searchTickets(actor: Actor, query: string, limit?: number): Promise<TicketHit[]>;
-  searchArticles(actor: Actor | null, query: string, limit?: number): Promise<ArticleHit[]>;
+  /** mode "any" matches any word (suggestions); "all" requires every word (search). */
+  searchArticles(actor: Actor | null, query: string, limit?: number, mode?: "all" | "any"): Promise<ArticleHit[]>;
 }
 
 let provider: SearchProvider | undefined;

@@ -300,3 +300,63 @@ The worker turns ticket events into in-app notifications (bell, polled every
 - When SMTP isn't configured, emails are rendered and logged, and marked
   `SKIPPED` in the email log, so the rest of the pipeline can still be
   tested.
+
+## Phase 4 — Customer portal
+
+### D-035 · One app, two faces
+The portal (`/portal`) and the agent console (`/agent`) are the same Next.js
+app. Both use the same services and permission checks, so the portal can only
+do what the requester's role allows. Agents can open the portal to see what
+customers see. The portal shows each workflow state's `portalName`, for
+example "Waiting for your reply" instead of "Waiting on Customer".
+
+### D-036 · Knowledge base permissions
+`kb.author` writes and edits drafts. `kb.publish` publishes, archives, edits
+published articles and manages categories. Anonymous visitors see only
+published **public** articles. `kb.view_internal` adds internal ones. Feedback
+("was this helpful?") is one vote per signed-in user (a change of mind updates
+it) and is rate-limited for anonymous visitors.
+
+### D-037 · Suggested articles
+While a requester types a new request, the subject and details are sent
+(debounced) to `/api/v1/kb/suggest`. It runs an **any-word** prefix query (stop
+words removed) ranked by relevance. Normal search requires every word. The
+endpoint is public, rate-limited, and only ever returns articles the caller
+may read.
+
+### D-038 · Catalog requests and approvals
+A catalog submission validates the item's own form, then creates a normal
+ticket (type, team and priority from the item; source `CATALOG`) plus a
+`CatalogRequest` holding the answers. Answers are also rendered into the
+ticket description so agents see them without extra UI. The ticket type's own
+required fields are filled from matching answers or neutral placeholders.
+- Items needing approval wait **unassigned** with an internal note naming the
+  approvers.
+- Approvers are the item's named approvers, or everyone with
+  `catalog.approve` if none are named. All of them get in-app and email
+  notifications.
+- The first decision wins. Approval assigns the ticket using the team's
+  strategy. Rejection requires a reason and closes the ticket (an
+  administrative bypass of the workflow, like merge). The requester is told
+  either way.
+
+### D-039 · CSAT
+When a ticket first reaches `csat.sendOn`, a survey is created once per ticket
+(even if the ticket is later reopened and resolved again). It's sent
+immediately or after `csat.delayMinutes`, and skipped if the ticket was
+reopened meanwhile. The email has one-click rating links carrying an
+unguessable token, so no sign-in is needed. Requesters can also rate inline
+in the portal. Answers can be changed for 7 days.
+
+### D-040 · Sign-up, password reset, invites
+Public sign-up (feature flag) creates requester accounts and applies the
+password policy and per-IP rate limits. Password reset never reveals whether
+an account exists. Tokens are random 256-bit values, stored as SHA-256 hashes
+only, single-use, valid for 1 hour (resets) or 72 hours (admin "set your
+password" invites). Using one ends existing sessions and clears any lockout.
+
+### D-041 · Seeding never contacts anyone
+A global side-effects switch (`src/server/side-effects.ts`) stops queued jobs
+and outgoing email while demo data is loaded. Emails generated during seeding
+are recorded as `SKIPPED` ("demo data") so the email log still shows what
+would have been sent.

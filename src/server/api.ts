@@ -41,6 +41,8 @@ export type ApiContext<S extends Schemas> = {
   body: Infer<S, "body">;
   query: Infer<S, "query">;
   params: Infer<S, "params">;
+  /** Signed-in caller or null (only meaningful with `optionalAuth`). Never a privileged stand-in. */
+  viewer: Actor | null;
   audit: AuditContext;
   requestId: string;
   /** Record an audit entry (in addition to the automatic one). */
@@ -52,6 +54,8 @@ export type ApiOptions<S extends Schemas> = S & {
   permission?: Permission | Permission[];
   /** No authentication at all (health checks, inbound webhooks with their own auth). */
   public?: boolean;
+  /** Public, but resolve the caller if signed in / using an API key: `ctx.viewer` is the actor or null. */
+  optionalAuth?: boolean;
   /** Any signed-in actor; the handler checks finer permissions itself. */
   authOnly?: boolean;
   /** Audit action name for mutations, e.g. "user.update". Defaults to METHOD + path. */
@@ -124,7 +128,7 @@ export function apiRoute<S extends Schemas>(opts: ApiOptions<S>, handler: (ctx: 
       // 1. Authenticate
       let actor = null as Actor | null;
       let viaApiKey = false;
-      if (!opts.public) {
+      if (!opts.public || opts.optionalAuth) {
         const authz = req.headers.get("authorization");
         if (authz?.startsWith("Bearer ")) {
           actor = await authenticateApiKey(authz.slice(7).trim());
@@ -133,7 +137,7 @@ export function apiRoute<S extends Schemas>(opts: ApiOptions<S>, handler: (ctx: 
         } else {
           actor = await getCurrentActor();
         }
-        if (!actor) throw new HttpError(401, "Authentication required");
+        if (!actor && !opts.optionalAuth) throw new HttpError(401, "Authentication required");
       }
 
       // 2. CSRF: cookie-authenticated mutations must come from our own origin.
@@ -177,7 +181,9 @@ export function apiRoute<S extends Schemas>(opts: ApiOptions<S>, handler: (ctx: 
 
       const ctx: ApiContext<S> = {
         req,
-        actor: actor ?? { kind: "system", label: "public" },
+        // Public routes get a permissionless placeholder; use `viewer` for the real caller.
+        actor: actor ?? { kind: "user", id: "", email: "", name: "anonymous", roles: [], permissions: new Set(), organizationId: null, orgTicketAccess: false, teamIds: [] },
+        viewer: actor,
         body: body as Infer<S, "body">,
         query: query as Infer<S, "query">,
         params: params as Infer<S, "params">,

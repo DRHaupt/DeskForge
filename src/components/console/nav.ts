@@ -19,6 +19,8 @@ export const NAV: NavSection[] = [
       { href: "/agent", label: "Home", icon: "home", permissions: ["ticket.view_team", "ticket.view_all"] },
       { href: "/agent/tickets", label: "Tickets", icon: "inbox", permissions: ["ticket.view_team", "ticket.view_all"] },
       { href: "/agent/search", label: "Search", icon: "list", permissions: ["ticket.view_team", "ticket.view_all"] },
+      { href: "/agent/approvals", label: "Approvals", icon: "check", permissions: ["catalog.approve", "change.approve"] },
+      { href: "/agent/kb", label: "Knowledge base", icon: "book", permissions: ["kb.author", "kb.view_internal"], feature: "knowledgeBase" },
     ],
   },
   {
@@ -28,6 +30,7 @@ export const NAV: NavSection[] = [
       { href: "/admin/roles", label: "Roles", icon: "shield", permissions: ["role.manage"] },
       { href: "/admin/teams", label: "Teams", icon: "users-round", permissions: ["team.manage"] },
       { href: "/admin/organizations", label: "Organizations", icon: "building", permissions: ["org.view"] },
+      { href: "/admin/catalog", label: "Service catalog", icon: "bag", permissions: ["catalog.manage"], feature: "serviceCatalog" },
       { href: "/admin/email", label: "Email log", icon: "message", permissions: ["config.view"] },
       { href: "/admin/audit", label: "Audit log", icon: "scroll", permissions: ["audit.view"] },
     ],

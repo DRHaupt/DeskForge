@@ -186,30 +186,31 @@ model User {
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
-  organization      Organization?      @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  roles             UserRole[]
-  identities        UserIdentity[]
-  teamMemberships   TeamMember[]
-  requestedTickets  Ticket[]           @relation("TicketRequester")
-  assignedTickets   Ticket[]           @relation("TicketAssignee")
-  createdTickets    Ticket[]           @relation("TicketCreator")
-  comments          Comment[]
-  watching          TicketWatcher[]
-  statusChanges     StatusHistory[]
-  attachments       Attachment[]
-  articles          KnowledgeArticle[]
-  articleFeedback   ArticleFeedback[]
-  catalogRequests   CatalogRequest[]
-  approvals         Approval[]
-  assets            Asset[]
-  notifications     Notification[]
-  savedViews        SavedView[]
-  csatResponses     CSATResponse[]
-  apiKeys           ApiKey[]
-  cannedResponses   CannedResponse[]
-  automations       Automation[]
-  auditLogs         AuditLog[]
-  escalationForTeam Team[]             @relation("TeamEscalationUser")
+  organization        Organization?        @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  roles               UserRole[]
+  identities          UserIdentity[]
+  teamMemberships     TeamMember[]
+  requestedTickets    Ticket[]             @relation("TicketRequester")
+  assignedTickets     Ticket[]             @relation("TicketAssignee")
+  createdTickets      Ticket[]             @relation("TicketCreator")
+  comments            Comment[]
+  watching            TicketWatcher[]
+  statusChanges       StatusHistory[]
+  attachments         Attachment[]
+  articles            KnowledgeArticle[]
+  articleFeedback     ArticleFeedback[]
+  catalogRequests     CatalogRequest[]
+  approvals           Approval[]
+  assets              Asset[]
+  notifications       Notification[]
+  savedViews          SavedView[]
+  csatResponses       CSATResponse[]
+  apiKeys             ApiKey[]
+  cannedResponses     CannedResponse[]
+  automations         Automation[]
+  auditLogs           AuditLog[]
+  escalationForTeam   Team[]               @relation("TeamEscalationUser")
+  passwordResetTokens PasswordResetToken[]
 
   @@index([tenantId])
   @@index([organizationId])
@@ -1137,6 +1138,25 @@ model OutboundEmail {
   @@index([ticketId])
   @@index([status, createdAt])
   @@map("outbound_emails")
+}
+
+/// One-time password reset (and invite) tokens. Only a hash is stored.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tenantId  String?   @map("tenant_id")
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  /// "reset" or "invite"
+  purpose   String    @default("reset")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 /// Key/value store for small runtime state (e.g. IMAP last-seen UIDs).

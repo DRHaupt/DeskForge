@@ -3,3 +3,4 @@
  * ticket service, so every entry point — UI, API, email, worker — gets them).
  */
 import "./sla";
+import "./services/csat";

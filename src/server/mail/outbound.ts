@@ -10,6 +10,7 @@ import { logger } from "../logger";
 import { enqueue, QUEUES } from "../queue";
 import { renderEmail, type EmailContent } from "./templates";
 import { getMailTransport } from "./transport";
+import { emailSideEffectsEnabled } from "../side-effects";
 
 export function senderAddress() {
   const cfg = getConfig();
@@ -79,11 +80,11 @@ export async function queueEmail(input: QueueEmailInput): Promise<string | null>
       inReplyTo,
       html,
       text,
-      status: cfg.email.enabled ? "QUEUED" : "SKIPPED",
-      error: cfg.email.enabled ? null : "email.enabled is false in business config",
+      status: cfg.email.enabled && emailSideEffectsEnabled() ? "QUEUED" : "SKIPPED",
+      error: !cfg.email.enabled ? "email.enabled is false in business config" : emailSideEffectsEnabled() ? null : "not sent (demo data)",
     },
   });
-  if (!cfg.email.enabled) return row.id;
+  if (!cfg.email.enabled || !emailSideEffectsEnabled()) return row.id;
   if (sendInline()) await sendOutbound(row.id).catch(() => undefined);
   else await enqueue(QUEUES.email, "send-email", { id: row.id });
   return row.id;

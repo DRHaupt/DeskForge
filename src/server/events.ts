@@ -10,6 +10,7 @@ import type { Actor } from "@/core/rbac/actor";
 import { actorLabel, actorUserId } from "@/core/rbac/actor";
 import { logger } from "./logger";
 import { enqueue, QUEUES } from "./queue";
+import { setQueueing, sideEffectsEnabled } from "./side-effects";
 
 export const TICKET_EVENTS = [
   "ticket.created",
@@ -46,10 +47,9 @@ export function onTicketEvent(hook: TicketHook) {
   hooks.push(hook);
 }
 
-/** Set to false in tests to skip queueing. */
-let queueingEnabled = process.env.NODE_ENV !== "test";
+/** Queueing follows the global side-effects switch (off in tests and while seeding). */
 export function setEventQueueing(on: boolean) {
-  queueingEnabled = on;
+  setQueueing(on);
 }
 
 export async function emitTicketEvent(type: TicketEventType, ticketId: string, actor: Actor, extra: Partial<Pick<TicketEvent, "changes" | "commentId" | "depth" | "viaTransition">> = {}): Promise<TicketEvent> {
@@ -67,6 +67,6 @@ export async function emitTicketEvent(type: TicketEventType, ticketId: string, a
       logger.error({ err, type, ticketId }, "ticket hook failed");
     }
   }
-  if (queueingEnabled) await enqueue(QUEUES.events, type, event);
+  if (sideEffectsEnabled()) await enqueue(QUEUES.events, type, event);
   return event;
 }

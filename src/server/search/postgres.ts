@@ -5,15 +5,21 @@ import { db } from "../db";
 import { ticketVisibilityWhere } from "../services/ticket-access";
 import type { ArticleHit, SearchProvider, TicketHit } from "./index";
 
-/** Build a safe prefix tsquery: "vpn conn" → 'vpn:* & conn:*'. Returns null for empty input. */
-export function toPrefixQuery(input: string): string | null {
-  const tokens = input
+const STOPWORDS = new Set(["a", "an", "and", "are", "as", "at", "be", "but", "by", "can", "do", "for", "from", "has", "have", "how", "i", "if", "in", "is", "it", "keeps", "me", "my", "no", "not", "of", "on", "or", "our", "so", "that", "the", "this", "to", "up", "was", "we", "what", "when", "why", "with", "you", "your"]);
+
+/**
+ * Build a safe prefix tsquery from free text: "vpn conn" → 'vpn:* & conn:*'.
+ * mode "any" ORs the words (used for suggestions, where ranking does the work).
+ */
+export function toPrefixQuery(input: string, mode: "all" | "any" = "all"): string | null {
+  let tokens = input
     .toLowerCase()
     .split(/[^\p{L}\p{N}]+/u)
-    .filter((t) => t.length > 0)
-    .slice(0, 8);
+    .filter((t) => t.length > 0);
+  if (mode === "any") tokens = tokens.filter((t) => t.length > 2 && !STOPWORDS.has(t));
+  tokens = [...new Set(tokens)].slice(0, 12);
   if (!tokens.length) return null;
-  return tokens.map((t) => `${t}:*`).join(" & ");
+  return tokens.map((t) => `${t}:*`).join(mode === "any" ? " | " : " & ");
 }
 
 /** ts_headline output uses «» markers which the UI turns into <mark>. */
@@ -67,8 +73,8 @@ export class PostgresSearchProvider implements SearchProvider {
       .slice(0, limit);
   }
 
-  async searchArticles(actor: Actor | null, query: string, limit = 10): Promise<ArticleHit[]> {
-    const tsq = toPrefixQuery(query);
+  async searchArticles(actor: Actor | null, query: string, limit = 10, mode: "all" | "any" = "all"): Promise<ArticleHit[]> {
+    const tsq = toPrefixQuery(query, mode);
     if (!tsq) return [];
     const internal = actor ? can(actor, "kb.view_internal") : false;
     const rows = await db.$queryRaw<{ id: string; slug: string; title: string; rank: number; snippet: string; visibility: "PUBLIC" | "INTERNAL" }[]>`

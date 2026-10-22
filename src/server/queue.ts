@@ -43,3 +43,10 @@ export async function enqueue(name: QueueName, jobName: string, data: unknown, o
     logger.error({ err, queue: name, jobName }, "failed to enqueue job");
   }
 }
+
+/** Close queue connections (scripts that must exit cleanly). */
+export async function closeQueues(): Promise<void> {
+  const qs = globalForQueues.queues ? [...globalForQueues.queues.values()] : [];
+  await Promise.allSettled(qs.map((q) => q.close()));
+  globalForQueues.queues?.clear();
+}

@@ -7,6 +7,7 @@ import { sendOutbound } from "../server/mail/outbound";
 import { pollMailboxes } from "../server/mail/imap";
 import { sweepSla } from "../server/sla";
 import { notifyForEvent } from "../server/services/notifications";
+import { sendCsat } from "../server/services/csat";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- job payloads are validated inside each handler
 export type JobHandler = (data: any, job: Job) => Promise<unknown>;
@@ -26,5 +27,6 @@ export const handlers: Record<string, JobHandler> = {
   "sla-sweep": async () => sweepSla(),
   "imap-poll": async () => pollMailboxes(),
   "send-email": async (data: { id: string }) => sendOutbound(data.id),
+  "send-csat": async (data: { id: string }) => sendCsat(data.id),
   ...Object.fromEntries(TICKET_EVENTS.map((name) => [name, (event: TicketEvent) => handleTicketEvent(event)])),
 };

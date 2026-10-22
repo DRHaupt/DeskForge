@@ -154,6 +154,24 @@ export function EditUserForm({ user, roles, organizations, canEdit, passwordHint
                 Unlock account
               </Button>
             )}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={pending}
+              onClick={async () => {
+                setPending(true);
+                try {
+                  await api(`/api/v1/users/${user.id}/invite`, { body: {} });
+                  toast.success("Password setup link sent");
+                } catch (err) {
+                  toast.error((err as Error).message);
+                } finally {
+                  setPending(false);
+                }
+              }}
+            >
+              Email password setup link
+            </Button>
             {user.totpEnabled && (
               <Button type="button" variant="outline" disabled={pending} onClick={() => save({ resetTwoFactor: true }, "Two-factor reset")}>
                 Reset two-factor

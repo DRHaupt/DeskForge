@@ -13,6 +13,7 @@ import { getConfig } from "@/core/config/loader";
 import { activeTicketTypes } from "@/core/config/helpers";
 import { canViewTicket, canSeeInternal } from "@/core/tickets/access";
 import { findTicketNumbers } from "@/core/tickets/numbering";
+import { fillRequiredFields } from "@/core/tickets/fields";
 import { isAgent, systemActor } from "@/core/rbac/actor";
 import { CommentSource, InboundEmailStatus } from "@/generated/prisma/enums";
 import { loadUserActor } from "../actor";
@@ -237,9 +238,8 @@ export async function processInbound(msg: InboundMessage, opts: { mailbox?: stri
     const description = msg.html ? sanitizeRichText(msg.html) : plainTextToHtml(msg.text || "");
     const attachmentIds = await storeAll(msg.attachments, null);
     const typeCfg = activeTicketTypes(cfg).find((t) => t.key === mailbox.ticketType);
-    // Email can't fill required custom fields; skip validation by creating with empty values where allowed.
-    const fields: Record<string, unknown> = {};
-    for (const f of typeCfg?.fields ?? []) if (f.required) fields[f.key] = f.type === "number" ? (f.min ?? 0) : f.type === "dropdown" || f.type === "multiselect" ? (f.type === "dropdown" ? f.options![0]!.value : [f.options![0]!.value]) : f.type === "date" ? new Date().toISOString().slice(0, 10) : f.type === "checkbox" ? false : "(via email)";
+    // Email can't ask for the type's required custom fields; fill neutral defaults.
+    const fields = fillRequiredFields(typeCfg?.fields ?? []);
     const created = await createTicket(
       systemActor("email"),
       {

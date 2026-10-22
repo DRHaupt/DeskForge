@@ -9,7 +9,6 @@ import { activeTicketTypes } from "../../src/core/config/helpers";
 import { systemActor, type Actor } from "../../src/core/rbac/actor";
 import type { Db } from "../../src/server/db";
 import { loadUserActor } from "../../src/server/actor";
-import { setEventQueueing } from "../../src/server/events";
 import { addComment, createTicket, transitionTicket } from "../../src/server/services/tickets";
 import { reconcileTicketSla } from "../../src/server/sla";
 import { seedExtras } from "./extras";
@@ -169,7 +168,6 @@ async function retime(db: Db, ticketId: string, createdAt: Date) {
 }
 
 export async function seedDemoContent(db: Db, cfg: BusinessConfig): Promise<void> {
-  setEventQueueing(false);
   const requesters = await db.user.findMany({ where: { roles: { some: { role: { key: "requester" } } } }, select: { id: true } });
   const agents = await db.user.findMany({ where: { roles: { some: { role: { key: { in: ["agent", "team_lead"] } } } } }, select: { id: true } });
   if (!requesters.length || !agents.length) return;
