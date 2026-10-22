@@ -157,7 +157,8 @@ describe("privilege escalation guards", () => {
 
 describe("CSRF", () => {
   it("rejects cookie-authenticated cross-origin mutations", async () => {
-    // Session mocked as signed-in admin for this request.
+    // Session mocked as signed-in admin (enrolled in 2FA, which admins need) for this request.
+    await db.user.update({ where: { id: adminId }, data: { totpEnabled: true } });
     const session = await import("@/server/session");
     const spy = vi.spyOn(session, "getCurrentActor").mockResolvedValue(await actorFor(adminId));
     const res = await createUserRoute(

@@ -56,6 +56,8 @@ export type ApiOptions<S extends Schemas> = S & {
   public?: boolean;
   /** Public, but resolve the caller if signed in / using an API key: `ctx.viewer` is the actor or null. */
   optionalAuth?: boolean;
+  /** Reachable by a signed-in user who still has to set up required 2FA (enrolment and account routes). */
+  allowTwoFactorSetup?: boolean;
   /** Any signed-in actor; the handler checks finer permissions itself. */
   authOnly?: boolean;
   /** Audit action name for mutations, e.g. "user.update". Defaults to METHOD + path. */
@@ -138,6 +140,9 @@ export function apiRoute<S extends Schemas>(opts: ApiOptions<S>, handler: (ctx: 
           actor = await getCurrentActor();
         }
         if (!actor && !opts.optionalAuth) throw new HttpError(401, "Authentication required");
+        if (actor?.kind === "user" && actor.mustEnrollTwoFactor && !opts.allowTwoFactorSetup) {
+          throw new HttpError(403, "Set up two-factor authentication before continuing");
+        }
       }
 
       // 2. CSRF: cookie-authenticated mutations must come from our own origin.

@@ -114,3 +114,23 @@
 .prose-df th, .prose-df td { @apply border px-2 py-1 text-left; }
 .prose-df img { @apply max-w-full h-auto rounded; }
 .prose-df .mention { @apply rounded bg-primary/10 px-1 text-primary font-medium; }
+
+/* Chart colours (validated categorical slots 1–2; see DECISIONS D-057). */
+:root {
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --chart-grid: #e5e7eb;
+  --chart-axis: #cbd5e1;
+  --status-good: #0ca30c;
+  --status-warning: #b77f00;
+  --status-critical: #d03b3b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --chart-grid: #1f2937;
+    --chart-axis: #334155;
+    --status-warning: #fab219;
+  }
+}

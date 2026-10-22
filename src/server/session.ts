@@ -16,10 +16,14 @@ export const getCurrentActor = cache(async (): Promise<UserActor | null> => {
   return loadUserActor(db, userId, sv);
 });
 
-/** For pages: redirect to login when signed out. */
-export async function requireActor(callbackUrl?: string): Promise<UserActor> {
+/**
+ * For pages: redirect to login when signed out, and to 2FA setup when the
+ * user's role requires it and they haven't enrolled yet.
+ */
+export async function requireActor(callbackUrl?: string, opts: { allowTwoFactorSetup?: boolean } = {}): Promise<UserActor> {
   const actor = await getCurrentActor();
   if (!actor) redirect(`/login${callbackUrl ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ""}`);
+  if (actor.mustEnrollTwoFactor && !opts.allowTwoFactorSetup) redirect("/account/two-factor?required=1");
   return actor;
 }
 

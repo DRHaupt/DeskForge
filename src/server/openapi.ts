@@ -19,6 +19,8 @@ import { webhookSchema } from "./webhooks";
 import { assetFilterSchema, assetInputSchema, importSchema } from "./services/assets";
 import { boardFilterSchema, moveSchema } from "./services/boards";
 import { knownErrorFilter, raiseProblemSchema } from "./services/problems";
+import { reportFilterSchema } from "./services/reports";
+import { codeSchema, disableSchema } from "./services/two-factor";
 import { markReadSchema } from "./services/notifications";
 import { csatAnswerSchema } from "./services/csat";
 
@@ -66,6 +68,12 @@ export const ENDPOINTS: Endpoint[] = [
   { method: "get", path: "/boards", tag: "ITSM", summary: "Agile boards defined in the business config", permission: ["ticket.view_team", "ticket.view_all"] },
   { method: "get", path: "/boards/{key}", tag: "ITSM", summary: "Board columns and cards", permission: ["ticket.view_team", "ticket.view_all"], query: boardFilterSchema },
   { method: "post", path: "/boards/{key}/move", tag: "ITSM", summary: "Move a card (transitions the ticket if the column changes)", permission: "ticket.update", body: moveSchema },
+  { method: "get", path: "/reports", tag: "Reports", summary: "Volumes, response/resolution times, SLA compliance, backlog, agents and CSAT for a period", permission: "report.view", query: reportFilterSchema },
+  { method: "get", path: "/reports/export/{kind}", tag: "Reports", summary: "CSV export: tickets, summary (daily), agents or sla", permission: "report.export", query: reportFilterSchema },
+  { method: "get", path: "/me/two-factor", tag: "Me", summary: "Two-factor status", permission: "signed-in" },
+  { method: "post", path: "/me/two-factor", tag: "Me", summary: "Start two-factor enrolment (returns secret and QR code)", permission: "signed-in" },
+  { method: "post", path: "/me/two-factor/confirm", tag: "Me", summary: "Confirm enrolment with a current code", permission: "signed-in", body: codeSchema },
+  { method: "post", path: "/me/two-factor/disable", tag: "Me", summary: "Turn two-factor off (password and code)", permission: "signed-in", body: disableSchema },
   { method: "get", path: "/me/assets", tag: "Me", summary: "Assets assigned to you", permission: "signed-in" },
   { method: "post", path: "/attachments", tag: "Attachments", summary: "Upload a file (multipart/form-data, field 'file'); reference the returned id when posting", permission: ["ticket.create", "ticket.reply", "ticket.comment_internal", "kb.author"], status: 201 },
   { method: "get", path: "/attachments/{id}", tag: "Attachments", summary: "Download an attachment you can see", permission: "signed-in" },

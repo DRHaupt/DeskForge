@@ -16,6 +16,8 @@ export type UserActor = {
   organizationId: string | null;
   orgTicketAccess: boolean;
   teamIds: string[];
+  /** Signed in with a password, holds a role that requires 2FA, and hasn't enrolled yet. */
+  mustEnrollTwoFactor?: boolean;
 };
 
 export type ApiKeyActor = {

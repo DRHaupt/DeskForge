@@ -24,6 +24,7 @@ export const NAV: NavSection[] = [
       { href: "/agent/kb", label: "Knowledge base", icon: "book", permissions: ["kb.author", "kb.view_internal"], feature: "knowledgeBase" },
       { href: "/agent/known-errors", label: "Known errors", icon: "alert", permissions: ["ticket.comment_internal"], feature: "problemManagement" },
       { href: "/agent/assets", label: "Assets", icon: "monitor", permissions: ["asset.view"], feature: "assets" },
+      { href: "/agent/reports", label: "Reports", icon: "chart", permissions: ["report.view"] },
       { href: "/agent/canned", label: "Canned responses", icon: "message", permissions: ["ticket.reply"] },
     ],
   },

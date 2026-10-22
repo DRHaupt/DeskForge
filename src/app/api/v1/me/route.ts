@@ -2,7 +2,7 @@ import { z } from "zod";
 import { apiRoute, HttpError } from "@/server/api";
 import { db } from "@/server/db";
 
-export const GET = apiRoute({ authOnly: true }, async ({ actor }) => {
+export const GET = apiRoute({ authOnly: true, allowTwoFactorSetup: true }, async ({ actor }) => {
   if (actor.kind !== "user") throw new HttpError(400, "Not a user session");
   const u = await db.user.findUniqueOrThrow({
     where: { id: actor.id },

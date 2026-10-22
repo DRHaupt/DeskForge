@@ -72,3 +72,22 @@ describe("boards", () => {
     expect(needsRebalance(1, 2)).toBe(false);
   });
 });
+
+import { dayKeys, formatDuration, percentile, startOfLocalDay } from "@/core/reports/stats";
+describe("report helpers", () => {
+  it("finds local midnight across zones and DST", () => {
+    const now = new Date("2026-10-22T03:00:00Z"); // 21 Oct 23:00 in New York
+    expect(startOfLocalDay(now, 0, "America/New_York").toISOString()).toBe("2026-10-21T04:00:00.000Z");
+    expect(startOfLocalDay(now, 6, "Europe/London").toISOString()).toBe("2026-10-15T23:00:00.000Z");
+    // Across the US DST end (1 Nov 2026)
+    expect(startOfLocalDay(new Date("2026-11-03T15:00:00Z"), 3, "America/New_York").toISOString()).toBe("2026-10-31T04:00:00.000Z");
+    expect(dayKeys(startOfLocalDay(now, 6, "Asia/Tokyo"), now, "Asia/Tokyo")).toHaveLength(7);
+  });
+  it("percentiles and durations", () => {
+    expect(percentile([], 0.5)).toBeNull();
+    expect(percentile([1, 2, 3, 4], 0.5)).toBe(2.5);
+    expect(formatDuration(45)).toBe("45m");
+    expect(formatDuration(200)).toBe("3h 20m");
+    expect(formatDuration(3000)).toBe("2d 2h");
+  });
+});
