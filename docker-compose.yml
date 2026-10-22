@@ -8,6 +8,7 @@
 #   --profile minio   S3-compatible object storage for attachments
 #   --profile caddy   Caddy reverse proxy with automatic HTTPS (set DOMAIN in .env;
 #                     behind Cloudflare also set CADDYFILE=Caddyfile.cloudflare)
+#   --profile cloudflared   Cloudflare Tunnel (set TUNNEL_TOKEN in .env); no open ports
 
 name: ${COMPOSE_PROJECT_NAME:-deskforge}
 
@@ -105,6 +106,19 @@ services:
     volumes:
       - ./deploy:/etc/caddy/deploy:ro
       - caddydata:/data
+    depends_on:
+      - app
+
+  # Cloudflare Tunnel (Zero Trust): no inbound ports. Create the tunnel in the
+  # Zero Trust dashboard, put its token in .env as TUNNEL_TOKEN, and route the
+  # public hostname to http://app:3000.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ["cloudflared"]
+    restart: unless-stopped
+    command: ["tunnel", "run"]
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
     depends_on:
       - app
 

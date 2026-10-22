@@ -552,3 +552,13 @@ bypass UFW, the documented way to lock the origin down is Authenticated Origin
 Pulls (mTLS), not a host firewall. For Cloudflare Tunnel setups,
 `CLIENT_IP_HEADER=cf-connecting-ip` makes the app read Cloudflare's header
 directly. All client-IP reads go through `src/server/client-ip.ts`.
+
+### D-064 · Cloudflare Tunnel
+`docker compose --profile cloudflared` runs the tunnel connector next to the app,
+configured only by `TUNNEL_TOKEN` (dashboard-managed tunnel). With a tunnel,
+the documented setup reads the visitor IP from `CF-Connecting-IP`
+(`CLIENT_IP_HEADER`) and keeps the app bound to localhost. Auth.js's `AUTH_URL`
+now defaults to `APP_BASE_URL`, so callback URLs and secure cookies never
+depend on the proxy sending `X-Forwarded-Proto`/`-Host`. Cloudflare Access is
+optional; the guide shows which paths must stay reachable without it (portal,
+sign-in, CSAT links, the inbound-email webhook, the API).

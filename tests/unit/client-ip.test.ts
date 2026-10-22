@@ -22,3 +22,13 @@ describe("clientIpFrom", () => {
     expect(clientIpFrom(new Headers({ "x-forwarded-for": "5.5.5.5" }))).toBe("5.5.5.5");
   });
 });
+
+describe("env parsing", () => {
+  it("treats an empty CLIENT_IP_HEADER as unset and rejects junk", async () => {
+    const { _envSchemaForTests } = await import("@/server/env");
+    const base = { DATABASE_URL: "postgres://x", AUTH_SECRET: "x".repeat(40) };
+    expect(_envSchemaForTests.parse({ ...base, CLIENT_IP_HEADER: "" }).CLIENT_IP_HEADER).toBeUndefined();
+    expect(_envSchemaForTests.parse({ ...base, CLIENT_IP_HEADER: "CF-Connecting-IP" }).CLIENT_IP_HEADER).toBe("cf-connecting-ip");
+    expect(_envSchemaForTests.safeParse({ ...base, CLIENT_IP_HEADER: "bad header!" }).success).toBe(false);
+  });
+});

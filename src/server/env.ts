@@ -41,7 +41,7 @@ const envSchema = z.object({
   /** Allow webhooks to private/internal addresses (off by default to prevent SSRF). */
   WEBHOOK_ALLOW_PRIVATE: bool,
   /** Header holding the visitor's IP when a trusted proxy sets one (e.g. cf-connecting-ip behind a Cloudflare Tunnel). */
-  CLIENT_IP_HEADER: z.string().trim().toLowerCase().regex(/^[a-z0-9-]+$/).optional(),
+  CLIENT_IP_HEADER: z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), z.string().trim().toLowerCase().regex(/^[a-z0-9-]+$/, "must be a header name like cf-connecting-ip").optional()),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(300),
   SEED_ADMIN_EMAIL: z.string().optional(),
   SEED_ADMIN_PASSWORD: z.string().optional(),
@@ -70,3 +70,6 @@ export function envValue(prefix: string, suffix: string): string | undefined {
   const v = process.env[`${prefix}_${suffix}`];
   return v && v.length ? v : undefined;
 }
+
+/** Exposed for tests only. */
+export const _envSchemaForTests = envSchema;

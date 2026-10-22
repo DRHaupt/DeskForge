@@ -220,6 +220,11 @@ export function buildAuthConfig(): NextAuthConfig {
   };
 }
 
+// Auth.js builds callback URLs and decides on secure cookies from AUTH_URL when
+// set, and otherwise from proxy headers (X-Forwarded-Proto/Host). Pin it to the
+// public URL so tunnels and proxies that don't send those headers still work.
+process.env.AUTH_URL ??= process.env.APP_BASE_URL;
+
 export const { handlers, auth, signIn, signOut } = NextAuth(() => buildAuthConfig());
 
 /** Exposed for tests only. */

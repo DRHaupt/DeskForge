@@ -319,7 +319,7 @@ Created once; edit afterwards in **Admin → Service catalog**.
 |---|---|---|
 | `DATABASE_URL` | **required** | `postgresql://user:pass@host:5432/db` |
 | `REDIS_URL` | `redis://localhost:6379` | Queues, rate limits. |
-| `APP_BASE_URL` | `http://localhost:3000` | Public URL, used in emails and OIDC callbacks. |
+| `APP_BASE_URL` | `http://localhost:3000` | Public URL, used in emails, OIDC callbacks and secure-cookie decisions (it becomes Auth.js's `AUTH_URL` unless you set that yourself). |
 | `AUTH_SECRET` | **required** | At least 32 characters (`openssl rand -base64 48`). Also encrypts stored secrets (2FA keys), so **back it up**: losing it disables every user's 2FA. |
 | `AUTH_TRUST_HOST` | | Set `true` behind a reverse proxy. |
 | `BUSINESS_CONFIG_PATH` | `./business.config.yaml` | |
@@ -337,6 +337,7 @@ Created once; edit afterwards in **Admin → Service catalog**.
 | `WEBHOOK_ALLOW_PRIVATE` | `false` | Allow outgoing webhooks to private or internal addresses. |
 | `RATE_LIMIT_PER_MINUTE` | `300` | Per user, API key or IP across the API. |
 | `CLIENT_IP_HEADER` | unset | Read the visitor's IP from this header instead of `X-Forwarded-For`, e.g. `cf-connecting-ip` behind a Cloudflare Tunnel. Only set it when the app can be reached **only** through that proxy, because clients could otherwise forge it. |
+| `TUNNEL_TOKEN` | unset | Cloudflare Tunnel token for `docker compose --profile cloudflared`. |
 | `CADDYFILE` | `Caddyfile` | For `--profile caddy`: `Caddyfile` (automatic Let's Encrypt) or `Caddyfile.cloudflare` (behind the Cloudflare proxy, with an origin certificate). |
 | `SLA_SWEEP_SECONDS` | `60` | How often the worker checks SLA timers. |
 | `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` | | Creates the first admin on `config:sync` (first start) if no admin exists. |

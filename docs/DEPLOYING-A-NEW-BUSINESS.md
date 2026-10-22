@@ -197,12 +197,72 @@ then presents a client certificate, and Caddy rejects anyone else.
 - **Bot protection**: *Bot Fight Mode* can challenge your mail provider's posts to `/api/inbound/email` and scripts calling `/api/v1`. If inbound email or API calls start getting 403s or challenge pages, turn it off. On paid plans, add a WAF skip rule for those paths instead.
 - **Inbound email webhooks** can come from your provider straight through Cloudflare. Nothing else is needed.
 
-**Alternative: Cloudflare Tunnel (no open ports at all).** Run `cloudflared`
-on the server, route `help.acme.example` to `http://localhost:3000`, and keep
-`APP_BIND=127.0.0.1` so only the tunnel can reach the app. Don't use the Caddy
-profile in this setup, and set `CLIENT_IP_HEADER=cf-connecting-ip` in `.env`
-so rate limits and audit logs see visitors' real IPs. That header is safe to
-trust only because nothing but the tunnel can reach the app.
+### HTTPS option E: Cloudflare Tunnel (Zero Trust)
+
+The server opens **no inbound ports**. A `cloudflared` container connects out
+to Cloudflare and carries the traffic, and Cloudflare provides the HTTPS
+certificate. You don't need Caddy, Nginx or an origin certificate.
+
+**In the Zero Trust dashboard** (one.dash.cloudflare.com):
+
+1. **Networks → Tunnels → Create a tunnel** → *Cloudflared* → name it (e.g. `helpdesk-acme`).
+2. On the install screen, copy the **token**: the long string after `--token` in any of the commands. You don't need to run those commands.
+3. **Public hostname**: subdomain `help`, your domain, service **HTTP** `app:3000`.
+   (`app` is the Compose service name. The tunnel container reaches it over the stack's internal network.)
+
+**On the server**, in `.env`:
+
+```ini
+APP_BASE_URL=https://help.acme.example
+AUTH_TRUST_HOST=true
+TUNNEL_TOKEN=<the token>
+CLIENT_IP_HEADER=cf-connecting-ip
+APP_BIND=127.0.0.1
+```
+
+Then start it:
+
+```sh
+docker compose --profile cloudflared up -d --build
+docker compose logs cloudflared     # look for "Registered tunnel connection"
+```
+
+The tunnel status in the dashboard turns *Healthy* and the site is live at
+`https://help.acme.example`.
+
+Why these settings matter:
+
+- **`CLIENT_IP_HEADER=cf-connecting-ip`**: through a tunnel, every request comes from the `cloudflared` container. This setting makes rate limits and the audit log use the real visitor's IP. It's only safe because nothing but the tunnel can reach the app: keep `APP_BIND=127.0.0.1` and don't open ports 80 or 443.
+- **`APP_BASE_URL`**: sign-in uses it for callback URLs and secure cookies. The tunnel talks plain HTTP to the app, so the app doesn't guess the URL from the request.
+- **Firewall**: you can enable UFW for SSH only (`sudo ufw allow OpenSSH && sudo ufw enable`). The tunnel needs outbound access only.
+
+**Zero Trust Access policies.** You don't need Cloudflare Access: DeskForge has
+its own sign-in and permissions. If you do add an Access application in front
+of the help desk, scope it carefully. Otherwise you will block people and
+services that can't pass an Access login:
+
+| Who | Paths | Access policy |
+|---|---|---|
+| Agents and admins | `/agent*`, `/admin*` | Optional: require your identity provider (an extra layer for staff). |
+| Requesters and customers | `/`, `/portal*`, `/login`, `/signup`, `/forgot-password`, `/reset-password`, `/account*`, `/csat*`, `/api/auth*`, `/_next*`, `/branding*` | Leave open (or **Bypass**). External customers can't pass a staff-only Access login. For an internal-only help desk where everyone is in your IdP, you can protect these too. |
+| Mail provider webhook | `/api/inbound/email` | **Bypass**. It's protected by `INBOUND_EMAIL_SECRET`. |
+| Integrations | `/api/v1*` | **Bypass**, or require an Access *service token*. Calls already need a DeskForge API key. |
+| Uptime checks | `/api/health` | **Bypass** (or keep it private). |
+
+Path-scoped Access applications are created under **Access → Applications →
+Add → Self-hosted**, with one application per path pattern. Clicking links in
+emails (ticket replies, CSAT ratings, password resets) only works for paths
+the recipient can reach.
+
+**Other Cloudflare settings** (same as option D): turn off **Rocket Loader**
+and **Email Address Obfuscation** for the host, don't use "Cache Everything",
+keep `UPLOAD_MAX_MB` under Cloudflare's 100 MB request limit, and turn off
+**Bot Fight Mode** if inbound-email webhooks or API calls get challenged.
+
+**Running `cloudflared` on the host instead** (for example if it already
+serves other sites): install it as a system service with the same token, set
+the public hostname's service to `http://localhost:3000`, and leave out the
+`cloudflared` profile. Everything else is the same.
 
 ## 5. Email
 
@@ -409,5 +469,8 @@ because only one process can listen on ports 80 and 443.
 | Cloudflare redirect loop | SSL mode is *Flexible*; switch to *Full (strict)*. |
 | Everyone hits sign-in rate limits behind Cloudflare | `CADDYFILE` isn't `Caddyfile.cloudflare`, or `deploy/cloudflare-ips.caddy` is out of date; run `scripts/update-cloudflare-ips.sh`. |
 | Pages half-load or buttons don't work behind Cloudflare | Rocket Loader or Email Address Obfuscation is on for the host. |
+| Tunnel shows *Down* / error 1033 | `docker compose logs cloudflared`: check `TUNNEL_TOKEN`, and that the server allows outbound connections on port 7844 (or 443). |
+| Tunnel error 502 | The public hostname's service must be `http://app:3000` (container) or `http://localhost:3000` (host-installed cloudflared), and the app must be healthy. |
+| Customers see a Cloudflare Access login | An Access application covers the portal paths; scope it to `/agent` and `/admin` (see the table in option E). |
 
 Upgrading to a new DeskForge version is covered in [`UPGRADING.md`](UPGRADING.md).
