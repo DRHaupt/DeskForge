@@ -43,8 +43,9 @@ services:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
       interval: 15s
       timeout: 5s
-      retries: 5
-      start_period: 60s
+      retries: 10
+      # First start runs migrations, config sync and (optionally) the demo seed.
+      start_period: 300s
 
   worker:
     <<: *app
