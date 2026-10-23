@@ -412,9 +412,14 @@ DeskForge accounts. This uses SCIM, the standard Entra uses for other apps.
 2. In DeskForge, open **Administration → Provisioning** and click **Generate
    token**. Copy the token (it's shown once) and the **Tenant URL**
    (`https://<your host>/scim/v2`).
-3. In the Entra admin center: **Enterprise applications** → the app with the
-   same name as your app registration → **Provisioning** → **Get started** (or
-   **New configuration**).
+3. In the Entra admin center, create a separate app for provisioning. Entra
+   doesn't offer provisioning on the app created through **App registrations**
+   for sign-in (the *Get started* button is greyed out there).
+   **Enterprise applications** → **New application** → **Create your own
+   application** → name it e.g. "DeskForge Provisioning" → choose *Integrate any
+   other application you don't find in the gallery (Non-gallery)* → **Create**.
+   Then, in that new app: **Provisioning** → **Get started** (or **New
+   configuration**). Sign-in keeps using the original app registration.
    - Provisioning Mode: **Automatic**.
    - Admin Credentials: paste the **Tenant URL** and **Secret Token**, then
      click **Test Connection**. It should say the credentials are authorized.
@@ -427,7 +432,7 @@ DeskForge accounts. This uses SCIM, the standard Entra uses for other apps.
      `userName` (the UPN), `active`, `displayName`, `name`, `emails[type eq "work"]`,
      `title` and `phoneNumbers`, and ignores the rest. If people's UPN isn't their
      email address, make sure `emails[type eq "work"].value` maps to `mail`.
-5. **Users and groups** (in the Enterprise application's menu): add the people or
+5. **Users and groups** (in the provisioning app's menu): add the people or
    groups who should get a help desk account. Under **Provisioning → Settings**,
    keep Scope at **Sync only assigned users and groups**.
 6. Back on **Provisioning → Overview**, click **Start provisioning**. The first
@@ -539,6 +544,8 @@ because only one process can listen on ports 80 and 443.
 | Tunnel shows *Down* / error 1033 | `docker compose logs cloudflared`: check `TUNNEL_TOKEN`, and that the server allows outbound connections on port 7844 (or 443). |
 | Tunnel error 502 | The public hostname's service must be `http://app:3000` (container) or `http://localhost:3000` (host-installed cloudflared), and the app must be healthy. |
 | Entra "Test Connection" fails | `scim.enabled` is `true` and the app was restarted; the Tenant URL ends in `/scim/v2`; the token was copied whole (generate a new one if unsure); `/scim*` isn't behind Cloudflare Access or Bot Fight Mode. |
+| Entra "Test Connection": 403 Forbidden with `[RedactedHtmlContent]` | The request was blocked before it reached DeskForge (DeskForge's own errors are JSON). Behind Cloudflare: add an Access **Bypass** application for `/scim`, and/or a WAF custom rule *URI Path starts with `/scim/`* → **Skip** (all remaining custom rules, rate limiting, managed rules, Super Bot Fight Mode); on the Free plan, Bot Fight Mode can't be skipped, so turn it off. Check **Security → Events** to see which feature blocked it. |
+| Provisioning *Get started* is greyed out in Entra | You're on the app created by App registrations. Create a separate *Non-gallery* enterprise application for provisioning (step 3 above). |
 | Entra provisioning log says the user already exists (409) | Another DeskForge account already uses that email and is linked to a different Entra user. Fix the email on one of them. |
 | Customers see a Cloudflare Access login | An Access application covers the portal paths; scope it to `/agent` and `/admin` (see the table in option E). |
 
