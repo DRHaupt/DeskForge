@@ -328,8 +328,11 @@ Users → (person) → Send welcome email**.
 | `welcome.title` | `You're all set` | Heading of the welcome step. |
 | `welcome.message` | short default | Plain text; a blank line starts a new paragraph. |
 | `welcome.links[]` | `[]` | `{ label, url, description? }` cards, e.g. `/portal/kb`. Put text containing commas **in quotes** (`description: "Email, VPN and printers"`), because a comma inside `{ … }` starts a new field. |
-| `email.subject` | `Welcome! Set up your account` | Subject of the welcome email. |
-| `email.message` | short default | Plain text; `{{firstName}}` and `{{name}}` are filled in. |
+| `email.subject` | `Set up your {{company}} account` | Subject of the welcome email. |
+| `email.heading` | `Set up your account` | Heading inside the email. |
+| `email.message` | professional default | Plain text. A blank line starts a new paragraph; lines starting with `- ` become a bulleted list. Placeholders: `{{firstName}}`, `{{name}}`, `{{company}}`, `{{supportEmail}}`. |
+| `email.buttonLabel` | `Set up your account` | The link is also written out under the button. |
+| `email.signature` | `["Thank you,", "IT Support"]` | Sign-off lines; the business name is added underneath. |
 | `notifyAdmins` | `true` | Admins get an in-app notification when someone finishes. |
 
 **How MFA is confirmed for SSO users.** The help desk can't register an

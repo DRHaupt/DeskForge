@@ -110,9 +110,16 @@ export function welcomeLink(email?: string): string {
   return appUrl(`/welcome${email ? `?email=${encodeURIComponent(email)}` : ""}`);
 }
 
+function fill(text: string, vars: Record<string, string>): string {
+  return text.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k: string) => vars[k] ?? "");
+}
+
+/** Blank lines separate paragraphs; single line breaks are kept (lists, addresses). */
 function paragraphs(text: string, vars: Record<string, string>): string[] {
-  const filled = text.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k: string) => vars[k] ?? "");
-  return filled.split(/\n\s*\n/).map((p) => p.replace(/\s*\n\s*/g, " ").trim()).filter(Boolean);
+  return fill(text, vars)
+    .split(/\n\s*\n/)
+    .map((p) => p.split("\n").map((l) => l.trimEnd()).join("\n").trim())
+    .filter(Boolean);
 }
 
 /** Email someone their personal welcome link. Admins only. */
@@ -123,14 +130,19 @@ export async function sendWelcomeEmail(actor: Actor, userId: string, ctx?: Audit
   const user = await db.user.findUnique({ where: { id: userId } });
   if (!user || !user.isActive) throw new NotFoundError("User");
   const link = welcomeLink(user.email);
+  const e = cfg.onboarding.email;
+  const vars = { firstName: user.name.split(" ")[0] ?? user.name, name: user.name, company: cfg.branding.name, supportEmail: cfg.branding.supportEmail };
   await queueEmail({
     kind: "onboarding.welcome",
     to: user.email,
-    subject: cfg.onboarding.email.subject,
+    subject: fill(e.subject, vars),
     content: {
-      heading: `Welcome to ${cfg.branding.name}`,
-      paragraphs: paragraphs(cfg.onboarding.email.message, { firstName: user.name.split(" ")[0] ?? user.name, name: user.name }),
-      button: { label: "Get started", url: link },
+      heading: fill(e.heading, vars),
+      preheader: `Your ${cfg.branding.name} account is ready. Sign in and set up multi-factor authentication.`,
+      paragraphs: paragraphs(e.message, vars),
+      button: { label: fill(e.buttonLabel, vars), url: link },
+      signature: [...e.signature.map((l) => fill(l, vars)), cfg.branding.name],
+      footerNote: `You're receiving this email because an account was created for you at ${cfg.branding.name}.`,
     },
   });
   await audit(actor, { action: "user.welcome_sent", entityType: "user", entityId: user.id }, ctx);

@@ -485,11 +485,21 @@ export const onboardingSchema = z
       .prefault({}),
     email: z
       .object({
-        subject: z.string().default("Welcome! Set up your account"),
-        /** Plain text; blank lines start new paragraphs. "{{firstName}}" is replaced. */
+        subject: z.string().default("Set up your {{company}} account"),
+        heading: z.string().default("Set up your account"),
+        /**
+         * Plain text. Blank lines separate paragraphs; lines starting with "- "
+         * become a bulleted list. Placeholders: {{firstName}}, {{name}},
+         * {{company}}, {{supportEmail}}.
+         */
         message: z
           .string()
-          .default("Hi {{firstName}},\n\nWelcome aboard. Please take two minutes to sign in and secure your account with multi-factor authentication."),
+          .default(
+            "Hi {{firstName}},\n\nYour {{company}} account is ready. Before you get started, please take a few minutes to:\n\n- Sign in with your work account\n- Set up multi-factor authentication with an authenticator app on your phone\n- See where to get IT help when you need it\n\nThe link below is personal to you, so please don't forward this email. If you have any trouble, reply to this message or contact {{supportEmail}}.",
+          ),
+        buttonLabel: z.string().default("Set up your account"),
+        /** Sign-off lines. */
+        signature: z.array(z.string()).default(["Thank you,", "IT Support"]),
       })
       .prefault({}),
     /** Notify admins in the app when someone finishes. */

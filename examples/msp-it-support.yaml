@@ -384,8 +384,17 @@ onboarding:
       - { label: Request something, url: /portal/catalog, description: "Laptops, software and access" }
       - { label: Report a problem, url: /portal/new }
   email:
-    subject: Welcome to Northbeam, set up your account
+    subject: "Set up your {{company}} account"
+    heading: Set up your account
     message: |
       Hi {{firstName}},
 
-      Welcome aboard! Please take two minutes to sign in to the IT help center and secure your account with multi-factor sign-in.
+      Your {{company}} account is ready. Before you get started, please take a few minutes to:
+
+      - Sign in with your Microsoft work account
+      - Set up multi-factor authentication with the Microsoft Authenticator app
+      - See where to get IT help when you need it
+
+      The link below is personal to you, so please don't forward this email. If you have any trouble, reply to this message or contact {{supportEmail}}.
+    buttonLabel: Set up your account
+    signature: ["Thank you,", "IT Support"]
