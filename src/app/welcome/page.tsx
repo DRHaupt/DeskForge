@@ -48,7 +48,12 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
     if (!provider || !actor) return;
     // Without the Graph check, only a fresh sign-in can show that MFA was used.
     const params: Record<string, string> = { login_hint: actor.email };
-    if (!o.checkRegisteredMethods) params.prompt = "login";
+    if (!o.checkRegisteredMethods) {
+      params.prompt = "login";
+      // Ask Entra for MFA on this sign-in. Tenants using Security defaults
+      // otherwise only prompt for MFA when Microsoft judges it necessary.
+      if (provider.type === "microsoft-entra-id") params.amr_values = "mfa";
+    }
     await signIn(provider.id, { redirectTo: "/welcome?checked=1" }, params);
   }
   async function switchAccount() {

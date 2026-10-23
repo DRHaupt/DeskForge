@@ -26,6 +26,11 @@ function amrOf(claims: Record<string, unknown> | null | undefined): string[] {
 }
 
 /** True when any of the given claim sets (ID token profile, decoded tokens) says MFA was used. */
+/** Every authentication method the identity provider reported (amr), for diagnostics. */
+export function reportedMethods(...claimSets: (Record<string, unknown> | null | undefined)[]): string[] {
+  return [...new Set(claimSets.flatMap(amrOf))];
+}
+
 export function signInUsedMfa(...claimSets: (Record<string, unknown> | null | undefined)[]): boolean {
   return claimSets.some((c) => amrOf(c).includes("mfa"));
 }

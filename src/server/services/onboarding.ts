@@ -8,7 +8,7 @@
  *   3. Welcome: the configured message and links, then into the portal.
  */
 import { getConfig } from "@/core/config/loader";
-import { decodeJwtClaims, hasStrongMethod, onboardingStep, signInUsedMfa, type OnboardingStep } from "@/core/auth/mfa";
+import { decodeJwtClaims, hasStrongMethod, onboardingStep, reportedMethods, signInUsedMfa, type OnboardingStep } from "@/core/auth/mfa";
 import { NotFoundError, ValidationError } from "@/core/errors";
 import { assertCan, isAgent, type Actor, type UserActor } from "@/core/rbac/actor";
 import { WILDCARD } from "@/core/rbac/permissions";
@@ -40,7 +40,8 @@ export async function recordSsoMfa(
 ): Promise<"sign-in" | "registered" | null> {
   try {
     let via: "sign-in" | "registered" | null = null;
-    if (signInUsedMfa(tokens.profile, decodeJwtClaims(tokens.idToken), decodeJwtClaims(tokens.accessToken))) {
+    const claims = [tokens.profile, decodeJwtClaims(tokens.idToken), decodeJwtClaims(tokens.accessToken)];
+    if (signInUsedMfa(...claims)) {
       via = "sign-in";
     } else if (graphScopeFor(providerId) && tokens.accessToken) {
       const res = await fetchImpl(GRAPH_METHODS_URL, { headers: { authorization: `Bearer ${tokens.accessToken}` }, signal: AbortSignal.timeout(8000) });
@@ -52,6 +53,8 @@ export async function recordSsoMfa(
       }
     }
     if (via) await db.user.update({ where: { id: userId }, data: { mfaVerifiedAt: new Date(), mfaVerifiedVia: via } });
+    // Helps explain "We couldn't confirm multi-factor sign-in": e.g. ["pwd"] means a password-only sign-in.
+    else logger.info({ userId, provider: providerId, methods: reportedMethods(...claims) }, "SSO sign-in without MFA");
     return via;
   } catch (err) {
     logger.warn({ err, userId }, "could not record MFA status");

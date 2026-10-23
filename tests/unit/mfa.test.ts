@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decodeJwtClaims, hasStrongMethod, onboardingStep, signInUsedMfa } from "@/core/auth/mfa";
+import { decodeJwtClaims, hasStrongMethod, onboardingStep, reportedMethods, signInUsedMfa } from "@/core/auth/mfa";
 
 const jwt = (claims: object) => `x.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.sig`;
 
@@ -22,4 +22,9 @@ describe("MFA detection", () => {
     expect(onboardingStep({ signedIn: true, requireMfa: true, mfaDone: true })).toBe("welcome");
     expect(onboardingStep({ signedIn: true, requireMfa: false, mfaDone: false })).toBe("welcome");
   });
+});
+
+it("reportedMethods lists every amr value once", () => {
+  expect(reportedMethods({ amr: ["pwd"] }, null, { amr: ["PWD", "rsa"] })).toEqual(["pwd", "rsa"]);
+  expect(reportedMethods(undefined)).toEqual([]);
 });
