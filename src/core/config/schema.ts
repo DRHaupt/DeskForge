@@ -63,6 +63,11 @@ export const brandingSchema = z.object({
   shortName: z.string().optional(),
   /** Path relative to the branding directory (BRANDING_DIR), or an absolute https URL. */
   logo: z.string().optional(),
+  /**
+   * Wide logo (symbol and name) for the top of emails. PNG or JPG: most email
+   * clients block SVG. Without it, emails show `logo` next to the business name.
+   */
+  emailLogo: z.string().optional(),
   favicon: z.string().optional(),
   colors: z
     .object({

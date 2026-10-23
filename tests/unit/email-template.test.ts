@@ -35,4 +35,15 @@ describe("email template", () => {
     setConfig(parseBusinessConfigYaml(yaml.replace("logo: logo.svg", "logo: logo.png")));
     expect(renderEmail({ heading: "x" }).html).toMatch(/<img src="[^"]*\/branding\/logo\.png"/);
   });
+
+  it("shows a square logo next to the name, or the wide email logo on its own", () => {
+    setConfig(parseBusinessConfigYaml(yaml.replace("logo: logo.svg", "logo: icon.png")));
+    const square = renderEmail({ heading: "x" }).html;
+    expect(square).toMatch(/<img src="[^"]*\/branding\/icon\.png" alt="" width="32"/);
+    expect(square).toMatch(/<span style="font-size:15px;font-weight:600;color:#111827">[^<]+<\/span>/);
+    setConfig(parseBusinessConfigYaml(yaml.replace("logo: logo.svg", "logo: icon.png\n  emailLogo: wide.png")));
+    const wide = renderEmail({ heading: "x" }).html;
+    expect(wide).toMatch(/<img src="[^"]*\/branding\/wide\.png" alt="[^"]+" height="36"/);
+    expect(wide).not.toContain("icon.png");
+  });
 });

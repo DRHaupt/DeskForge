@@ -68,6 +68,7 @@ export function renderEmail(c: EmailContent): { html: string; text: string } {
   const { branding } = getConfig();
   const primary = branding.colors.primary;
   const onPrimary = branding.colors.primaryForeground ?? readableForeground(primary);
+  const wideLogo = emailLogoUrl(branding.emailLogo);
   const logo = emailLogoUrl(branding.logo);
 
   const parts: string[] = [];
@@ -93,9 +94,12 @@ export function renderEmail(c: EmailContent): { html: string; text: string } {
     parts.push(`<p style="margin:24px 0 0;color:#374151">${c.signature.map((l) => escapeHtml(l)).join("<br>")}</p>`);
   }
 
-  const brandCell = logo
-    ? `<img src="${escapeHtml(logo)}" alt="${escapeHtml(branding.name)}" height="32" style="display:block;height:32px;width:auto;border:0">`
-    : `<span style="font-size:15px;font-weight:600;color:#111827">${escapeHtml(branding.name)}</span>`;
+  const nameHtml = `<span style="font-size:15px;font-weight:600;color:#111827">${escapeHtml(branding.name)}</span>`;
+  const brandCell = wideLogo
+    ? `<img src="${escapeHtml(wideLogo)}" alt="${escapeHtml(branding.name)}" height="36" style="display:block;height:36px;width:auto;border:0">`
+    : logo
+      ? `<table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:10px;vertical-align:middle"><img src="${escapeHtml(logo)}" alt="" width="32" height="32" style="display:block;width:32px;height:32px;border:0"></td><td style="vertical-align:middle;${FONT}">${nameHtml}</td></tr></table>`
+      : nameHtml;
   const footer = [c.footerNote ? escapeHtml(c.footerNote) : "", `${escapeHtml(branding.footer || branding.name)} · <a href="mailto:${escapeHtml(branding.supportEmail)}" style="color:#9ca3af">${escapeHtml(branding.supportEmail)}</a>`]
     .filter(Boolean)
     .join("<br>");

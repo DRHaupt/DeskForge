@@ -50,7 +50,8 @@ Always `1`.
 |---|---|---|---|
 | `name` | string | **required** | Shown everywhere: header, emails, page titles. |
 | `shortName` | string | `name` | Used in tight spaces (browser tab, mobile header). |
-| `logo` | path or https URL | none | Path relative to `BRANDING_DIR` (default `./branding`), served at `/branding/...`. SVG or PNG. |
+| `logo` | path or https URL | none | Square symbol shown next to the business name in the app. Path relative to `BRANDING_DIR` (default `./branding`), served at `/branding/...`. SVG or PNG. |
+| `emailLogo` | path or https URL | none | Wide logo (symbol and name) shown on its own at the top of emails. PNG or JPG, about 3× the display size (e.g. 756×144). Without it, emails show a PNG/JPG `logo` next to the business name. |
 | `favicon` | path or https URL | built-in | |
 | `colors.primary` | hex | `#2563eb` | Buttons, links, focus rings. |
 | `colors.accent` | hex | `#0ea5e9` | Highlights. |

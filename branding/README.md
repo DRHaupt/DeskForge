@@ -7,5 +7,7 @@ mounted read-only at `/app/config/branding` — see `docker-compose.yml`.
 
 Use a new file name for your own logo (for example `acme-logo.png`) rather
 than overwriting `logo.svg`, so `git pull` never conflicts with your file.
-Emails only show PNG, JPG or GIF logos (most email clients block SVG); with an
-SVG logo, emails show the business name instead.
+`logo` is a square symbol shown next to the business name. For emails, set
+`emailLogo` to a wide PNG (symbol and name). Emails only show PNG, JPG or GIF
+images (most email clients block SVG); with neither, emails show the business
+name.
