@@ -394,6 +394,13 @@ page with your links. Put the link in your HR onboarding email, or send it
 from **Administration → Users → Send welcome email** (that version has their
 email pre-filled).
 
+To send the temporary password Entra generated when you created the account,
+use **Sign-in details** on the same page: paste the password and click **Send
+sign-in details**. It's emailed to their work address and not stored anywhere.
+They need a way to read that mailbox first (for example a phone set up by IT);
+otherwise give them the password in person. The **Emails sent** list on the
+page shows each email, who sent it and, if it failed, why.
+
 ### Syncing users from Microsoft Entra (provisioning)
 
 Instead of adding people by hand, let Entra create, update and disable their

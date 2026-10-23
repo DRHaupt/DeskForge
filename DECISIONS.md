@@ -596,3 +596,15 @@ changed by provisioning, so promotions made in DeskForge stick. Delete and
 `active: false` deactivate and bump `sessionVersion`; nothing is erased, and
 the last admin is never deactivated. Groups aren't supported: teams and roles
 are managed in DeskForge.
+
+### D-068 · Sign-in details email (temporary passwords)
+Entra never exposes passwords (not over SCIM, not over Graph reads), so an
+admin pastes the temporary password Entra showed at creation, and the help
+desk emails it with the username. Resetting the password from the help desk
+through Graph was rejected: it needs an application permission that can reset
+any user's password, a large blast radius for a help desk server. The password
+is never stored. Unlike other mail it isn't queued: `sendSensitiveEmail`
+sends during the request, stores a copy rendered with the password masked, and
+reports SMTP errors to the admin immediately, because there's nothing kept to
+retry with. The route skips the generic API audit entry (which would include
+the request body); the service writes its own entry without the password.

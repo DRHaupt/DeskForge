@@ -10,10 +10,12 @@ import { formatDateTime } from "@/lib/format";
 import { requirePagePermission } from "@/server/session";
 import { getUser, listAuditLogs, listOrganizations, listRoles } from "@/server/services/admin";
 import { EditUserForm } from "./edit-user-form";
-import { WelcomeActions } from "./welcome-actions";
-import { welcomeLink } from "@/server/services/onboarding";
+import { SignInDetailsForm, WelcomeActions } from "./welcome-actions";
+import { emailHistoryFor, welcomeLink } from "@/server/services/onboarding";
 
 const MFA_VIA: Record<string, string> = { "sign-in": "MFA sign-in", registered: "authenticator registered", app: "help desk 2FA" };
+
+const EMAIL_KINDS: Record<string, string> = { "onboarding.welcome": "Welcome email", "onboarding.credentials": "Sign-in details" };
 
 export const metadata: Metadata = { title: "User" };
 
@@ -21,11 +23,12 @@ export default async function UserPage({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const actor = await requirePagePermission("user.view", `/admin/users/${id}`);
   const cfg = getConfig();
-  const [user, roles, orgs, history] = await Promise.all([
+  const [user, roles, orgs, history, emails] = await Promise.all([
     getUser(actor, id),
     listRoles(actor),
     can(actor, "org.view") ? listOrganizations(actor) : Promise.resolve([]),
     can(actor, "audit.view") ? listAuditLogs(actor, { entityType: "user", entityId: id, page: 1, pageSize: 10 }) : Promise.resolve(null),
+    emailHistoryFor(actor, id),
   ]);
   const tz = cfg.locale.timezone;
 
@@ -110,6 +113,39 @@ export default async function UserPage({ params }: { params: Promise<{ id: strin
               </CardContent>
             </Card>
           )}
+          {can(actor, "user.manage") && user.isActive && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Sign-in details</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <SignInDetailsForm userId={user.id} email={user.email} />
+              </CardContent>
+            </Card>
+          )}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Emails sent</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-3 text-sm">
+                {emails.map((m) => (
+                  <li key={m.id}>
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-medium">{EMAIL_KINDS[m.kind] ?? m.subject}</span>
+                      <Badge variant={m.status === "SENT" ? "secondary" : m.status === "FAILED" ? "destructive" : "outline"}>{m.status.toLowerCase()}</Badge>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {formatDateTime(m.createdAt, tz)}
+                      {m.sentBy ? ` · by ${m.sentBy}` : ""}
+                    </div>
+                    {m.error && <div className="mt-1 text-xs break-words text-destructive">{m.error}</div>}
+                  </li>
+                ))}
+                {emails.length === 0 && <li className="text-muted-foreground">No emails sent to this person yet.</li>}
+              </ul>
+            </CardContent>
+          </Card>
           {history && (
             <Card>
               <CardHeader>

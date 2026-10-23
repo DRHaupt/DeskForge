@@ -333,6 +333,11 @@ Users → (person) → Send welcome email**.
 | `email.message` | professional default | Plain text. A blank line starts a new paragraph; lines starting with `- ` become a bulleted list. Placeholders: `{{firstName}}`, `{{name}}`, `{{company}}`, `{{supportEmail}}`. |
 | `email.buttonLabel` | `Set up your account` | The link is also written out under the button. |
 | `email.signature` | `["Thank you,", "IT Support"]` | Sign-off lines; the business name is added underneath. |
+| `credentialsEmail.subject` | `Your {{company}} sign-in details` | Subject of the sign-in details email (below). |
+| `credentialsEmail.heading` | `Your sign-in details` | |
+| `credentialsEmail.message` | professional default | Same format and placeholders as `email.message`. The username and temporary password are shown in a box under it. |
+| `credentialsEmail.buttonLabel` | `Sign in` | Links to `/welcome` (or `/login` when onboarding is off). |
+| `credentialsEmail.signature` | `["Thank you,", "IT Support"]` | |
 | `notifyAdmins` | `true` | Admins get an in-app notification when someone finishes. |
 
 **How MFA is confirmed for SSO users.** The help desk can't register an
@@ -352,6 +357,16 @@ of two ways:
 
 Each user's page in **Administration → Users** shows when MFA was confirmed
 and when they finished onboarding.
+
+**Sign-in details email.** Entra doesn't share passwords with other apps, so the
+help desk can't fetch the temporary password Entra generates. On the user's
+page, **Sign-in details** lets an admin paste it; it's emailed with the
+username (the Entra user name when the account was provisioned) to the
+person's work address. The password is sent immediately and never stored: the
+Email log keeps a copy with it masked, and failures (for example an SMTP
+error) are shown straight away instead of being retried. The page's **Emails
+sent** list shows every email sent to the person, who sent it, and why any
+failed. This email works whether or not `onboarding.enabled` is on.
 
 
 ## `scim`

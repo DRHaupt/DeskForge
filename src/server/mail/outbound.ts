@@ -4,6 +4,7 @@
  * header pointing at the ticket's thread id so mail clients group them.
  */
 import { getConfig } from "@/core/config/loader";
+import { ValidationError } from "@/core/errors";
 import { randomToken } from "../crypto";
 import { db } from "../db";
 import { logger } from "../logger";
@@ -121,4 +122,40 @@ export async function sendOutbound(id: string): Promise<void> {
     logger.error({ err, id, to: row.toAddress }, "email send failed");
     throw err;
   }
+}
+
+/**
+ * Send right away, for messages that contain a secret (e.g. a temporary
+ * password). The secret is never stored: the Email log keeps a copy rendered
+ * from `storedContent`, where the secret is masked. Failures are reported to
+ * the caller instead of being retried later, because nothing is kept to retry with.
+ */
+export async function sendSensitiveEmail(input: QueueEmailInput & { storedContent: EmailContent }): Promise<{ id: string }> {
+  const cfg = getConfig();
+  if (!cfg.email.enabled) throw new ValidationError("Email is turned off (email.enabled in business.config.yaml)");
+  const transport = getMailTransport();
+  if (transport.name === "log") throw new ValidationError("Outgoing email isn't set up (SMTP_HOST in .env), so this can't be sent");
+  const to = input.to.trim().toLowerCase();
+  if (!to || ownAddresses().has(to)) throw new ValidationError("Can't send this to the help desk's own address");
+  const sender = senderAddress();
+  const messageId = `<msg.${randomToken(9).replace(/[^\w-]/g, "x")}@${sender.domain}>`;
+  const stored = renderEmail(input.storedContent);
+  const row = await db.outboundEmail.create({
+    data: { kind: input.kind, toAddress: to, ccAddress: [], subject: input.subject.slice(0, 250), messageId, html: stored.html, text: stored.text, status: "QUEUED" },
+  });
+  if (!emailSideEffectsEnabled()) {
+    await db.outboundEmail.update({ where: { id: row.id }, data: { status: "SKIPPED", error: "not sent (demo data)" } });
+    return { id: row.id };
+  }
+  const { html, text } = renderEmail(input.content);
+  try {
+    await transport.send({ from: sender.from, replyTo: sender.address, to, subject: input.subject, html, text, messageId });
+  } catch (err) {
+    const message = (err as Error).message.slice(0, 1000);
+    await db.outboundEmail.update({ where: { id: row.id }, data: { status: "FAILED", attempts: 1, error: message } });
+    logger.warn({ id: row.id, kind: input.kind, err: message }, "sensitive email failed");
+    throw new ValidationError(`The email couldn't be sent: ${message}`);
+  }
+  await db.outboundEmail.update({ where: { id: row.id }, data: { status: "SENT", sentAt: new Date(), attempts: 1 } });
+  return { id: row.id };
 }

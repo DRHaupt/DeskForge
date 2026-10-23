@@ -15,7 +15,7 @@ import { WILDCARD } from "@/core/rbac/permissions";
 import { audit, type AuditContext } from "../audit";
 import { db } from "../db";
 import { logger } from "../logger";
-import { queueEmail } from "../mail/outbound";
+import { queueEmail, sendSensitiveEmail } from "../mail/outbound";
 import { appUrl } from "../mail/templates";
 import { notifyUsers } from "./notifications";
 
@@ -132,7 +132,7 @@ export async function sendWelcomeEmail(actor: Actor, userId: string, ctx?: Audit
   const link = welcomeLink(user.email);
   const e = cfg.onboarding.email;
   const vars = { firstName: user.name.split(" ")[0] ?? user.name, name: user.name, company: cfg.branding.name, supportEmail: cfg.branding.supportEmail };
-  await queueEmail({
+  const emailId = await queueEmail({
     kind: "onboarding.welcome",
     to: user.email,
     subject: fill(e.subject, vars),
@@ -145,8 +145,63 @@ export async function sendWelcomeEmail(actor: Actor, userId: string, ctx?: Audit
       footerNote: `You're receiving this email because an account was created for you at ${cfg.branding.name}.`,
     },
   });
-  await audit(actor, { action: "user.welcome_sent", entityType: "user", entityId: user.id }, ctx);
+  await audit(actor, { action: "user.welcome_sent", entityType: "user", entityId: user.id, changes: { emailId } }, ctx);
   return { link };
+}
+
+const MASK = "••••••••";
+
+/**
+ * Email someone the temporary password their identity provider generated
+ * (Entra shows it once when the account is created). Sent immediately and
+ * never stored; the Email log keeps a copy with the password masked.
+ */
+export async function sendSignInDetails(actor: Actor, userId: string, temporaryPassword: string, ctx?: AuditContext) {
+  assertCan(actor, "user.manage");
+  const password = temporaryPassword.trim();
+  if (password.length < 4 || password.length > 256 || /[\r\n]/.test(password)) throw new ValidationError("Paste the temporary password exactly as shown (one line)");
+  const cfg = getConfig();
+  const user = await db.user.findUnique({ where: { id: userId } });
+  if (!user || !user.isActive) throw new NotFoundError("User");
+  const e = cfg.onboarding.credentialsEmail;
+  const vars = { firstName: user.name.split(" ")[0] ?? user.name, name: user.name, company: cfg.branding.name, supportEmail: cfg.branding.supportEmail };
+  const username = user.scimUserName ?? user.email;
+  const link = cfg.onboarding.enabled ? welcomeLink(user.email) : appUrl("/login");
+  const content = (pw: string) => ({
+    heading: fill(e.heading, vars),
+    preheader: `Your sign-in details for ${cfg.branding.name}.`,
+    paragraphs: paragraphs(e.message, vars),
+    facts: [
+      ["Username", username],
+      ["Temporary password", pw],
+    ] as [string, string][],
+    button: { label: fill(e.buttonLabel, vars), url: link },
+    signature: [...e.signature.map((l) => fill(l, vars)), cfg.branding.name],
+    footerNote: `You're receiving this email because an account was created for you at ${cfg.branding.name}.`,
+  });
+  const { id } = await sendSensitiveEmail({ kind: "onboarding.credentials", to: user.email, subject: fill(e.subject, vars), content: content(password), storedContent: content(MASK) });
+  await audit(actor, { action: "user.signin_details_sent", entityType: "user", entityId: user.id, changes: { to: user.email, emailId: id } }, ctx);
+  return { sentTo: user.email };
+}
+
+/** Emails sent to this person (newest first), for the log on their admin page. */
+export async function emailHistoryFor(actor: Actor, userId: string, take = 20) {
+  assertCan(actor, "user.view");
+  const user = await db.user.findUnique({ where: { id: userId }, select: { email: true } });
+  if (!user) throw new NotFoundError("User");
+  const rows = await db.outboundEmail.findMany({
+    where: { toAddress: user.email },
+    orderBy: { createdAt: "desc" },
+    take,
+    select: { id: true, kind: true, subject: true, status: true, error: true, createdAt: true, sentAt: true },
+  });
+  // Who sent each onboarding email, from the audit log.
+  const audits = await db.auditLog.findMany({
+    where: { entityId: userId, action: { in: ["user.signin_details_sent", "user.welcome_sent"] } },
+    select: { actorLabel: true, changes: true },
+  });
+  const sender = new Map(audits.map((a) => [(a.changes as { emailId?: string } | null)?.emailId, a.actorLabel]));
+  return rows.map((r) => ({ ...r, sentBy: sender.get(r.id) ?? null }));
 }
 
 /** Where to go after the welcome step. */

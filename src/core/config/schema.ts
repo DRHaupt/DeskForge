@@ -502,6 +502,25 @@ export const onboardingSchema = z
         signature: z.array(z.string()).default(["Thank you,", "IT Support"]),
       })
       .prefault({}),
+    /**
+     * The "Send sign-in details" email: an admin pastes the temporary password
+     * the identity provider generated, and it's emailed (never stored).
+     * Placeholders: {{firstName}}, {{name}}, {{company}}, {{supportEmail}}.
+     * The username and temporary password are shown in a box under the message.
+     */
+    credentialsEmail: z
+      .object({
+        subject: z.string().default("Your {{company}} sign-in details"),
+        heading: z.string().default("Your sign-in details"),
+        message: z
+          .string()
+          .default(
+            "Hi {{firstName}},\n\nBelow are the details to sign in to your {{company}} account for the first time. You'll be asked to choose a new password when you sign in.\n\nPlease keep these details private and delete this email once you've signed in. If you have any trouble, contact {{supportEmail}}.",
+          ),
+        buttonLabel: z.string().default("Sign in"),
+        signature: z.array(z.string()).default(["Thank you,", "IT Support"]),
+      })
+      .prefault({}),
     /** Notify admins in the app when someone finishes. */
     notifyAdmins: z.boolean().default(true),
   })
