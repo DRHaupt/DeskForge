@@ -38,7 +38,7 @@ export async function confirmEnrollment(actor: UserActor, input: z.infer<typeof 
   if (u.totpEnabled) throw new ConflictError("Two-factor authentication is already on");
   if (!u.totpSecret) throw new ValidationError("Start setup first");
   if (!verifyTotpCode(decryptSecret(u.totpSecret), input.code)) throw new ValidationError("That code didn't match. Check your phone's clock and try the newest code.", { code: "invalid" });
-  await db.user.update({ where: { id: actor.id }, data: { totpEnabled: true } });
+  await db.user.update({ where: { id: actor.id }, data: { totpEnabled: true, mfaVerifiedAt: new Date(), mfaVerifiedVia: "app" } });
   await audit(actor, { action: "auth.2fa_enabled", entityType: "user", entityId: actor.id }, ctx);
   return { enabled: true };
 }

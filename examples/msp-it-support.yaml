@@ -363,3 +363,29 @@ itsm:
   cabMembers: [dana.whitfield@northbeam-it.example, raj.patel@northbeam-it.example]
   cabQuorum: 1
   cabRequiredForRisk: [medium, high]
+
+# Onboarding page for new staff (/welcome): sign in with Microsoft, set up
+# multi-factor sign-in, then a welcome page. Link to it from onboarding emails,
+# or send it from Administration → Users → Send welcome email.
+onboarding:
+  enabled: false
+  provider: entra
+  requireMfa: true
+  mfaSetupUrl: https://aka.ms/mysecurityinfo
+  checkRegisteredMethods: false
+  welcome:
+    title: Welcome to Northbeam
+    message: |
+      You're all set. This is where you ask IT for help, request equipment and find how-to guides.
+
+      For anything urgent, call the service desk on +1 555 0100.
+    links:
+      - { label: Browse help articles, url: /portal/kb, description: "Guides for email, VPN and printers" }
+      - { label: Request something, url: /portal/catalog, description: "Laptops, software and access" }
+      - { label: Report a problem, url: /portal/new }
+  email:
+    subject: Welcome to Northbeam, set up your account
+    message: |
+      Hi {{firstName}},
+
+      Welcome aboard! Please take two minutes to sign in to the IT help center and secure your account with multi-factor sign-in.

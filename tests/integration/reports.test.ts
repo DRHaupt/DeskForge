@@ -47,6 +47,22 @@ describe("reports", () => {
     expect(r.csat).not.toBeNull();
   });
 
+  it("buckets days in the business time zone, not UTC", async () => {
+    // 23:30 in New York on the 1st is 03:30 UTC on the 2nd.
+    const t = await createTicket(requester, { type: "incident", title: "Late evening ticket" });
+    await db.ticket.update({ where: { id: t.id }, data: { createdAt: new Date(Date.now() - 2 * 86_400_000) } });
+    const r = await buildReport(lead, { range: "7d" });
+    const { dayKey } = await import("@/core/reports/stats");
+    const expectedKey = dayKey(new Date(Date.now() - 2 * 86_400_000), "America/New_York");
+    expect(r.series.created[r.days.indexOf(expectedKey)]).toBeGreaterThanOrEqual(1);
+    const rows = await db.$queryRaw<{ day: string }[]>`SELECT to_char((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'America/New_York', 'YYYY-MM-DD') AS day FROM tickets WHERE id = ${t.id}`;
+    expect(rows[0]!.day).toBe(expectedKey);
+    // A fixed instant that is "yesterday" in New York but "today" in UTC.
+    const fixed = await db.$queryRaw<{ day: string }[]>`SELECT to_char(('2026-10-23 03:30:00'::timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'America/New_York', 'YYYY-MM-DD') AS day`;
+    expect(fixed[0]!.day).toBe("2026-10-22");
+    await db.ticket.update({ where: { id: t.id }, data: { deletedAt: new Date() } });
+  });
+
   it("filters by team and type", async () => {
     const team = await db.team.findUniqueOrThrow({ where: { key: "systems" } });
     expect((await buildReport(lead, { range: "7d", team: team.id })).totals.created).toBe(0);

@@ -453,6 +453,50 @@ export const boardSchema = z.object({
   columns: z.array(z.object({ name: z.string(), states: z.array(keySchema).min(1), wipLimit: z.number().int().optional() })).min(1),
 });
 
+// ─── Onboarding ────────────────────────────────────────────────────────────
+
+export const onboardingSchema = z
+  .object({
+    /** Turns on the /welcome page that onboarding emails link to. */
+    enabled: z.boolean().default(false),
+    /**
+     * id of the auth.oidc provider people sign in with (e.g. "entra"). Omit to
+     * use email and password, in which case step 2 is the app's own 2FA setup.
+     */
+    provider: keySchema.optional(),
+    /** People must have multi-factor sign-in before they can finish. */
+    requireMfa: z.boolean().default(true),
+    /** Where people register an authenticator with the identity provider. */
+    mfaSetupUrl: z.url().default("https://aka.ms/mysecurityinfo"),
+    /**
+     * Microsoft Entra ID only: also ask Microsoft Graph whether the person has an
+     * authenticator registered. Needs the delegated Graph permission
+     * UserAuthenticationMethod.Read with admin consent. Without it, MFA counts
+     * as set up once a sign-in reports MFA.
+     */
+    checkRegisteredMethods: z.boolean().default(false),
+    welcome: z
+      .object({
+        title: z.string().default("You're all set"),
+        /** Plain text; blank lines start new paragraphs. */
+        message: z.string().default("Your account is ready. Here's where to get help when you need it."),
+        links: z.array(z.object({ label: z.string(), url: z.string(), description: z.string().optional() })).default([]),
+      })
+      .prefault({}),
+    email: z
+      .object({
+        subject: z.string().default("Welcome! Set up your account"),
+        /** Plain text; blank lines start new paragraphs. "{{firstName}}" is replaced. */
+        message: z
+          .string()
+          .default("Hi {{firstName}},\n\nWelcome aboard. Please take two minutes to sign in and secure your account with multi-factor authentication."),
+      })
+      .prefault({}),
+    /** Notify admins in the app when someone finishes. */
+    notifyAdmins: z.boolean().default(true),
+  })
+  .prefault({});
+
 // ─── Root ──────────────────────────────────────────────────────────────────
 
 export const businessConfigSchema = z
@@ -473,6 +517,7 @@ export const businessConfigSchema = z
     catalog: z.array(catalogItemSchema).default([]),
     organizations: z.array(organizationSeedSchema).default([]),
     boards: z.array(boardSchema).default([]),
+    onboarding: onboardingSchema,
     /** Problem/change specific options. */
     itsm: z
       .object({
@@ -592,6 +637,17 @@ export const businessConfigSchema = z
         }),
       );
     });
+
+    // Onboarding
+    if (cfg.onboarding.provider) {
+      const p = cfg.auth.oidc.find((o) => o.id === cfg.onboarding.provider);
+      if (!p) issue(["onboarding", "provider"], `no auth.oidc provider with id "${cfg.onboarding.provider}"`);
+      else if (cfg.onboarding.checkRegisteredMethods && p.type !== "microsoft-entra-id") {
+        issue(["onboarding", "checkRegisteredMethods"], "only works with a microsoft-entra-id provider");
+      }
+    } else if (cfg.onboarding.enabled && !cfg.auth.local.enabled) {
+      issue(["onboarding", "provider"], "set a provider, because local sign-in is disabled");
+    }
 
     // Features vs types
     cfg.ticketTypes.forEach((t, i) => {

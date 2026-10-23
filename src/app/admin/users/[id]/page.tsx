@@ -10,6 +10,10 @@ import { formatDateTime } from "@/lib/format";
 import { requirePagePermission } from "@/server/session";
 import { getUser, listAuditLogs, listOrganizations, listRoles } from "@/server/services/admin";
 import { EditUserForm } from "./edit-user-form";
+import { WelcomeActions } from "./welcome-actions";
+import { welcomeLink } from "@/server/services/onboarding";
+
+const MFA_VIA: Record<string, string> = { "sign-in": "MFA sign-in", registered: "authenticator registered", app: "help desk 2FA" };
 
 export const metadata: Metadata = { title: "User" };
 
@@ -73,14 +77,33 @@ export default async function UserPage({ params }: { params: Promise<{ id: strin
                 {[user.hasPassword && "Password", ...user.identities.map((i) => i.provider)].filter(Boolean).join(", ") || "None yet"}
               </p>
               <p>
-                <span className="text-muted-foreground">Two-factor:</span> {user.totpEnabled ? "Enabled" : "Off"}
+                <span className="text-muted-foreground">Two-factor (app):</span> {user.totpEnabled ? "Enabled" : "Off"}
               </p>
+              <p>
+                <span className="text-muted-foreground">MFA confirmed:</span>{" "}
+                {user.mfaVerifiedAt ? `${formatDateTime(user.mfaVerifiedAt, tz)} (${MFA_VIA[user.mfaVerifiedVia ?? ""] ?? user.mfaVerifiedVia})` : "Not yet"}
+              </p>
+              {cfg.onboarding.enabled && (
+                <p>
+                  <span className="text-muted-foreground">Onboarding:</span> {user.onboardedAt ? `Finished ${formatDateTime(user.onboardedAt, tz)}` : "Not finished"}
+                </p>
+              )}
               <p>
                 <span className="text-muted-foreground">Teams:</span>{" "}
                 {user.teamMemberships.map((m) => `${m.team.name}${m.isLead ? " (lead)" : ""}`).join(", ") || "—"}
               </p>
             </CardContent>
           </Card>
+          {cfg.onboarding.enabled && can(actor, "user.manage") && user.isActive && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Onboarding</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <WelcomeActions userId={user.id} link={welcomeLink(user.email)} onboarded={Boolean(user.onboardedAt)} />
+              </CardContent>
+            </Card>
+          )}
           {history && (
             <Card>
               <CardHeader>

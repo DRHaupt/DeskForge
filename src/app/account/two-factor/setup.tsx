@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/sonner";
 import { api } from "@/lib/api-client";
 
-export function TwoFactorSetup({ enabled, hasPassword, required }: { enabled: boolean; hasPassword: boolean; required: boolean }) {
+export function TwoFactorSetup({ enabled, hasPassword, required, next = "/" }: { enabled: boolean; hasPassword: boolean; required: boolean; next?: string }) {
   const router = useRouter();
   const [enroll, setEnroll] = useState<{ secret: string; qrSvg: string; otpauthUrl: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -109,7 +109,7 @@ export function TwoFactorSetup({ enabled, hasPassword, required }: { enabled: bo
             try {
               await api("/api/v1/me/two-factor/confirm", { body: { code: new FormData(e.currentTarget).get("code") } });
               toast.success("Two-factor sign-in is on");
-              router.push("/");
+              router.push(next);
               router.refresh();
             } catch (err) {
               setError((err as Error).message);

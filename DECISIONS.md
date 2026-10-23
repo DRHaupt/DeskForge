@@ -562,3 +562,22 @@ now defaults to `APP_BASE_URL`, so callback URLs and secure cookies never
 depend on the proxy sending `X-Forwarded-Proto`/`-Host`. Cloudflare Access is
 optional; the guide shows which paths must stay reachable without it (portal,
 sign-in, CSAT links, the inbound-email webhook, the API).
+
+### D-065 · Onboarding (/welcome)
+A three-step page (sign in, MFA, welcome) that onboarding emails link to,
+configured under `onboarding`. The help desk can't register an authenticator
+in Entra on someone's behalf, so step 2 sends people to Microsoft's
+Security info page and then confirms MFA. A fresh sign-in must carry
+`amr: mfa` (read from the ID token, or from the Graph access token, which
+Entra issues as a JWT), or, optionally, Microsoft Graph must list a strong
+authentication method (authenticator app, phone, FIDO2, Windows Hello, OATH).
+Password, email and temporary access passes don't count. The result is stored
+on the user (`mfaVerifiedAt`, `mfaVerifiedVia`). Password-only users use the
+app's own TOTP for step 2. Finishing is idempotent and notifies admins once.
+SSO users stay exempt from the app's own TOTP requirement (D-058).
+
+### D-066 · Dev server `distDir`
+`distDir` is only set when `NEXT_DIST_DIR` is set (the e2e harness). With an
+explicit `distDir`, the dev server watched its own log files, so each request
+triggered a rebuild and the browser reloaded in a loop. Production
+(`next start`) was never affected.

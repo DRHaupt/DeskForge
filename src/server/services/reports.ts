@@ -33,6 +33,8 @@ function ticketScope(f: ReportFilter): Prisma.Sql {
   return Prisma.join(parts, " AND ");
 }
 
+// Timestamps are stored as UTC in "timestamp without time zone" columns, so convert
+// UTC → local explicitly: (ts AT TIME ZONE 'UTC') AT TIME ZONE <zone>.
 const mins = (a: Date, b: Date) => (b.getTime() - a.getTime()) / 60_000;
 
 export async function buildReport(actor: Actor, raw: z.input<typeof reportFilterSchema>) {
@@ -46,10 +48,10 @@ export async function buildReport(actor: Actor, raw: z.input<typeof reportFilter
 
   const [createdDaily, resolvedDaily, responseRows, resolutionRows, sla, backlogByTeam, backlogByPriority, byType, bySource, agents, csat, reopened] = await Promise.all([
     db.$queryRaw<{ day: string; n: number }[]>`
-      SELECT to_char(t.created_at AT TIME ZONE ${tz}, 'YYYY-MM-DD') AS day, count(*)::int AS n
+      SELECT to_char((t.created_at AT TIME ZONE 'UTC') AT TIME ZONE ${tz}, 'YYYY-MM-DD') AS day, count(*)::int AS n
       FROM tickets t WHERE ${scope} AND t.created_at >= ${from} AND t.created_at <= ${to} GROUP BY 1`,
     db.$queryRaw<{ day: string; n: number }[]>`
-      SELECT to_char(t.resolved_at AT TIME ZONE ${tz}, 'YYYY-MM-DD') AS day, count(*)::int AS n
+      SELECT to_char((t.resolved_at AT TIME ZONE 'UTC') AT TIME ZONE ${tz}, 'YYYY-MM-DD') AS day, count(*)::int AS n
       FROM tickets t WHERE ${scope} AND t.resolved_at >= ${from} AND t.resolved_at <= ${to} GROUP BY 1`,
     db.$queryRaw<{ c: Date; r: Date }[]>`
       SELECT t.created_at AS c, t.first_responded_at AS r FROM tickets t

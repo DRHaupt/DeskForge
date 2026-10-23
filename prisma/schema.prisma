@@ -174,6 +174,12 @@ model User {
   timezone          String?
   avatarUrl         String?   @map("avatar_url")
   lastLoginAt       DateTime? @map("last_login_at")
+  /// When the user finished the /welcome onboarding flow.
+  onboardedAt       DateTime? @map("onboarded_at")
+  /// Last time multi-factor sign-in was confirmed for this user (SSO MFA or local TOTP).
+  mfaVerifiedAt     DateTime? @map("mfa_verified_at")
+  /// How MFA was confirmed: "sign-in" (MFA claim on an SSO sign-in) or "registered" (authenticator registered with the identity provider).
+  mfaVerifiedVia    String?   @map("mfa_verified_via")
   failedLoginCount  Int       @default(0) @map("failed_login_count")
   lockedUntil       DateTime? @map("locked_until")
   passwordChangedAt DateTime? @map("password_changed_at")

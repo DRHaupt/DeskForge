@@ -311,6 +311,46 @@ Created once; edit afterwards in **Admin → Service catalog**.
 | `cabQuorum` | `1` | Approvals needed (capped at the number of voters). Any rejection rejects. |
 | `cabRequiredForRisk` | `[medium, high]` | Risk levels that need a CAB vote. Others are approved automatically. A risk level must be set before submitting. |
 
+## `onboarding`
+
+A `/welcome` page for new people, meant to be linked from onboarding emails:
+**1. sign in → 2. secure the account with multi-factor sign-in → 3. welcome page**.
+Admins can also email someone their personal link from **Administration →
+Users → (person) → Send welcome email**.
+
+| Field | Default | Notes |
+|---|---|---|
+| `enabled` | `false` | Turns the page on. |
+| `provider` | none | `id` of an `auth.oidc` provider (e.g. `entra`). People sign in with it on step 1. Without it, they use email and password, and step 2 is the app's own 2FA setup. |
+| `requireMfa` | `true` | Step 2 must be completed before the welcome page. |
+| `mfaSetupUrl` | `https://aka.ms/mysecurityinfo` | Where people register an authenticator with the identity provider (Microsoft's "Security info" page). |
+| `checkRegisteredMethods` | `false` | Entra only. Also ask Microsoft Graph whether the person has an authenticator registered. See below. |
+| `welcome.title` | `You're all set` | Heading of the welcome step. |
+| `welcome.message` | short default | Plain text; a blank line starts a new paragraph. |
+| `welcome.links[]` | `[]` | `{ label, url, description? }` cards, e.g. `/portal/kb`. Put text containing commas **in quotes** (`description: "Email, VPN and printers"`), because a comma inside `{ … }` starts a new field. |
+| `email.subject` | `Welcome! Set up your account` | Subject of the welcome email. |
+| `email.message` | short default | Plain text; `{{firstName}}` and `{{name}}` are filled in. |
+| `notifyAdmins` | `true` | Admins get an in-app notification when someone finishes. |
+
+**How MFA is confirmed for SSO users.** The help desk can't register an
+authenticator itself; that happens on Microsoft's page. It confirms MFA in one
+of two ways:
+
+- **Default:** when the person clicks *I've set it up, continue*, they sign in
+  again, and the sign-in must report that MFA was used (the `amr` claim
+  contains `mfa`). This works when your tenant asks for MFA at sign-in
+  (Security defaults, or a Conditional Access policy requiring MFA for all users).
+- **`checkRegisteredMethods: true`:** the help desk also asks Microsoft Graph
+  (`/me/authentication/methods`) whether an authenticator is registered, so it
+  works even when sign-in doesn't prompt for MFA. In Entra, add the delegated
+  Microsoft Graph permission **UserAuthenticationMethod.Read** to the app
+  registration and click **Grant admin consent**. Without consent, Microsoft
+  sign-in fails for users.
+
+Each user's page in **Administration → Users** shows when MFA was confirmed
+and when they finished onboarding.
+
+
 ---
 
 ## Environment variables (`.env`)

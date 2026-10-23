@@ -20,6 +20,7 @@ import { envValue } from "./env";
 import { logger } from "./logger";
 import { dummyVerify, verifyPassword } from "./passwords";
 import { verifyTotp } from "./totp";
+import { graphScopeFor, recordSsoMfa } from "./services/onboarding";
 import { rateLimit } from "./rate-limit";
 import { clientIpFrom } from "./client-ip";
 import { normalizeEmail, provisionUser } from "./users";
@@ -68,7 +69,9 @@ function buildOidcProvider(p: OidcProviderConfig): Provider {
   const clientSecret = envValue(p.envPrefix, "CLIENT_SECRET")!;
   const issuer = envValue(p.envPrefix, "ISSUER");
   if (p.type === "microsoft-entra-id") {
-    return MicrosoftEntraID({ id: p.id, name: p.label, clientId, clientSecret, issuer });
+    // Onboarding can check for a registered authenticator via Microsoft Graph (needs admin consent).
+    const scope = graphScopeFor(p.id) ? "openid profile email User.Read UserAuthenticationMethod.Read" : "openid profile email User.Read";
+    return MicrosoftEntraID({ id: p.id, name: p.label, clientId, clientSecret, issuer, authorization: { params: { scope } } });
   }
   if (p.type === "google") {
     return Google({ id: p.id, name: p.label, clientId, clientSecret });
@@ -197,6 +200,7 @@ export function buildAuthConfig(): NextAuthConfig {
         });
         if (!userId) return "/login?error=AccessDenied";
         user.id = userId;
+        await recordSsoMfa(userId, account.provider, { profile: profile as Record<string, unknown> | undefined, idToken: account.id_token, accessToken: account.access_token });
         await db.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } });
         await audit(systemActor("auth"), { action: "auth.login", entityType: "user", entityId: userId, changes: { method: account.provider } });
         return true;

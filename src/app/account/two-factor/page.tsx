@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { PortalShell } from "@/components/portal/portal-shell";
+import { safeCallbackUrl } from "@/lib/safe-redirect";
 import { requireActor } from "@/server/session";
 import { twoFactorStatus } from "@/server/services/two-factor";
 import { TwoFactorSetup } from "./setup";
@@ -8,10 +9,10 @@ import { TwoFactorSetup } from "./setup";
 export const metadata: Metadata = { title: "Two-factor sign-in" };
 export const dynamic = "force-dynamic";
 
-export default async function TwoFactorPage({ searchParams }: { searchParams: Promise<{ required?: string }> }) {
+export default async function TwoFactorPage({ searchParams }: { searchParams: Promise<{ required?: string; next?: string }> }) {
   const actor = await requireActor("/account/two-factor", { allowTwoFactorSetup: true });
   const status = await twoFactorStatus(actor);
-  const { required } = await searchParams;
+  const { required, next } = await searchParams;
   return (
     <PortalShell actor={actor}>
       <div className="mx-auto max-w-xl space-y-6 px-4 py-10">
@@ -31,7 +32,7 @@ export default async function TwoFactorPage({ searchParams }: { searchParams: Pr
             Your role needs two-factor sign-in. Set it up now to continue.
           </p>
         )}
-        <TwoFactorSetup enabled={status.enabled} hasPassword={status.hasPassword} required={status.required} />
+        <TwoFactorSetup enabled={status.enabled} hasPassword={status.hasPassword} required={status.required} next={safeCallbackUrl(next, "/")} />
       </div>
     </PortalShell>
   );

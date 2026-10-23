@@ -383,6 +383,16 @@ The first sign-in links the identity to an existing user with the same
 the identity provider. You can set `auth.local.enabled: false` to allow SSO only, but keep
 one admin who can still sign in (for example through SSO).
 
+### Onboarding new staff (`/welcome`)
+
+With SSO set up, you can give new people one link to get started:
+`https://<your host>/welcome`. Turn it on with the `onboarding` section of
+`business.config.yaml` (see the config reference). It walks them through
+signing in with Microsoft, setting up Microsoft Authenticator, and a welcome
+page with your links. Put the link in your HR onboarding email, or send it
+from **Administration → Users → Send welcome email** (that version has their
+email pre-filled).
+
 ## 7. File storage
 
 Attachments go to the `uploads` Docker volume by default. To use S3-compatible
