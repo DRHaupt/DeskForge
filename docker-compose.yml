@@ -68,7 +68,9 @@ services:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-deskforge} -d ${POSTGRES_DB:-deskforge}"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 30
+      # First start initialises the database, which can take a while on slow disks.
+      start_period: 120s
 
   redis:
     image: redis:7-alpine
@@ -80,7 +82,8 @@ services:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 30
+      start_period: 60s
 
   minio:
     image: minio/minio:latest
