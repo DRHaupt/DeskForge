@@ -14,8 +14,6 @@ name: ${COMPOSE_PROJECT_NAME:-deskforge}
 
 x-app: &app
   image: ${DESKFORGE_IMAGE:-deskforge:local}
-  build:
-    context: ${DESKFORGE_SRC:-.}
   env_file: .env
   environment:
     DATABASE_URL: postgresql://${POSTGRES_USER:-deskforge}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-deskforge}
@@ -35,6 +33,9 @@ x-app: &app
 services:
   app:
     <<: *app
+    # Only this service builds the image; the worker runs the same image.
+    build:
+      context: ${DESKFORGE_SRC:-.}
     command: ["web"]
     ports:
       - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"
@@ -48,6 +49,8 @@ services:
   worker:
     <<: *app
     command: ["worker"]
+    # Uses the image built for `app` (or pulled from DESKFORGE_IMAGE); never pulled separately.
+    pull_policy: never
     depends_on:
       app:
         condition: service_healthy

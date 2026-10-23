@@ -11,6 +11,7 @@ several businesses side by side (see [several businesses on one server](#several
 ## What you need
 
 - A Linux server with Docker Engine 24+ and the Compose plugin. 2 vCPU and 4 GB RAM is plenty for a few hundred agents.
+- **At least 25 GB of free disk** (40 GB+ recommended). The app image is about 2 GB, and building it from source briefly needs another 8–10 GB of build cache. After a build you can reclaim the cache with `docker builder prune`. On Ubuntu with LVM, the installer often leaves part of the disk unallocated: check with `sudo vgs` and grow the root volume with `sudo lvextend -r -l +100%FREE /dev/ubuntu-vg/ubuntu-lv`.
 - A domain or subdomain you control, for example `help.example.com`.
 - An SMTP service for outgoing mail (Microsoft 365, Google Workspace, Postmark, Amazon SES, Mailgun…).
 - Optional: a Microsoft Entra ID tenant or Google Workspace for single sign-on.
@@ -464,6 +465,7 @@ because only one process can listen on ports 80 and 443.
 | Emails not sent | **Admin → Email log** shows each attempt and its error; check that the worker is running (`docker compose ps`). |
 | Replies create new tickets | The provider must keep the `In-Reply-To`/`References` headers, or keep `[INC0000123]` in the subject. |
 | SLA timers never warn or breach | The worker isn't running, or business hours/holidays exclude the current time. |
+| Build fails with "no space left on device" | Free disk space (see *What you need*): grow the disk or LVM volume, or run `docker builder prune -f` and `docker image prune -f`, then build again. |
 | Uploads fail | `client_max_body_size` in Nginx is below `UPLOAD_MAX_MB`, or the file type isn't allowed. |
 | Cloudflare error 525/526 | SSL mode isn't *Full (strict)*, or `deploy/certs/origin.pem`/`.key` are missing or don't match. |
 | Cloudflare redirect loop | SSL mode is *Flexible*; switch to *Full (strict)*. |
