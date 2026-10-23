@@ -16,6 +16,7 @@ import {
   MessageSquareText,
   Monitor,
   Package,
+  RefreshCw,
   ScrollText,
   Shield,
   ShoppingBag,
@@ -55,6 +56,7 @@ const ICONS: Record<string, LucideIcon> = {
   alert: TriangleAlert,
   branch: GitBranch,
   file: FileText,
+  sync: RefreshCw,
 };
 
 export function NavIcon({ name, className }: { name: string; className?: string }) {

@@ -180,6 +180,12 @@ model User {
   mfaVerifiedAt     DateTime? @map("mfa_verified_at")
   /// How MFA was confirmed: "sign-in" (MFA claim on an SSO sign-in) or "registered" (authenticator registered with the identity provider).
   mfaVerifiedVia    String?   @map("mfa_verified_via")
+  /// Set when the account is managed by SCIM provisioning (e.g. Microsoft Entra).
+  provisionedVia    String?   @map("provisioned_via")
+  /// The identity provider's id for this user (SCIM externalId).
+  scimExternalId    String?   @map("scim_external_id")
+  /// The identity provider's userName (often the UPN), used to match SCIM requests.
+  scimUserName      String?   @map("scim_user_name")
   failedLoginCount  Int       @default(0) @map("failed_login_count")
   lockedUntil       DateTime? @map("locked_until")
   passwordChangedAt DateTime? @map("password_changed_at")
@@ -220,6 +226,8 @@ model User {
 
   @@index([tenantId])
   @@index([organizationId])
+  @@index([scimExternalId])
+  @@index([scimUserName])
   @@map("users")
 }
 

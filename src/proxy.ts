@@ -54,6 +54,6 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     // Pages only: skip API routes (they set their own headers), static files and images.
-    { source: "/((?!api|_next/static|_next/image|branding|favicon.ico).*)", missing: [{ type: "header", key: "next-router-prefetch" }] },
+    { source: "/((?!api|scim|_next/static|_next/image|branding|favicon.ico).*)", missing: [{ type: "header", key: "next-router-prefetch" }] },
   ],
 };

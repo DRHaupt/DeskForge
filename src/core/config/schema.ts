@@ -507,6 +507,19 @@ export const onboardingSchema = z
   })
   .prefault({});
 
+// ─── SCIM provisioning ─────────────────────────────────────────────────────
+
+export const scimSchema = z
+  .object({
+    /** Accept user provisioning from an identity provider (e.g. Microsoft Entra) at /scim/v2. */
+    enabled: z.boolean().default(false),
+    /** Role given to people created by provisioning. Admin can't be granted this way. */
+    defaultRole: keySchema.refine((r) => r !== "admin", "provisioning can't create admins; promote people in the admin UI").default("requester"),
+    /** Email new people their onboarding link as soon as they're provisioned (needs onboarding.enabled). */
+    sendWelcomeEmail: z.boolean().default(false),
+  })
+  .prefault({});
+
 // ─── Root ──────────────────────────────────────────────────────────────────
 
 export const businessConfigSchema = z
@@ -528,6 +541,7 @@ export const businessConfigSchema = z
     organizations: z.array(organizationSeedSchema).default([]),
     boards: z.array(boardSchema).default([]),
     onboarding: onboardingSchema,
+    scim: scimSchema,
     /** Problem/change specific options. */
     itsm: z
       .object({
@@ -657,6 +671,10 @@ export const businessConfigSchema = z
       }
     } else if (cfg.onboarding.enabled && !cfg.auth.local.enabled) {
       issue(["onboarding", "provider"], "set a provider, because local sign-in is disabled");
+    }
+
+    if (cfg.scim.sendWelcomeEmail && !cfg.onboarding.enabled) {
+      issue(["scim", "sendWelcomeEmail"], "needs onboarding.enabled: true");
     }
 
     // Features vs types

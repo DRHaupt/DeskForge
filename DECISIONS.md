@@ -581,3 +581,18 @@ SSO users stay exempt from the app's own TOTP requirement (D-058).
 explicit `distDir`, the dev server watched its own log files, so each request
 triggered a rebuild and the browser reloaded in a loop. Production
 (`next start`) was never affected.
+
+### D-067 · SCIM user provisioning
+Entra (or any SCIM 2.0 client) pushes users to `/scim/v2`. The endpoints sit
+outside `apiRoute` because SCIM has its own error format, content type and
+auth: a single bearer token, stored as a SHA-256 hash in `system_settings`,
+shown once, compared in constant time, rate limited by IP before the check.
+Matching is by our id, then `externalId`, `userName` (stored separately
+because a UPN can differ from the email) or email, all case-insensitive. A
+create for an email that already exists links that account instead of
+failing, unless it's already linked to another directory user (409). Roles
+are only set on create (`scim.defaultRole`, never an admin role) and never
+changed by provisioning, so promotions made in DeskForge stick. Delete and
+`active: false` deactivate and bump `sessionVersion`; nothing is erased, and
+the last admin is never deactivated. Groups aren't supported: teams and roles
+are managed in DeskForge.

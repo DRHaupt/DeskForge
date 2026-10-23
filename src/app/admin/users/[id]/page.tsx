@@ -83,6 +83,12 @@ export default async function UserPage({ params }: { params: Promise<{ id: strin
                 <span className="text-muted-foreground">MFA confirmed:</span>{" "}
                 {user.mfaVerifiedAt ? `${formatDateTime(user.mfaVerifiedAt, tz)} (${MFA_VIA[user.mfaVerifiedVia ?? ""] ?? user.mfaVerifiedVia})` : "Not yet"}
               </p>
+              {user.provisionedVia === "scim" && (
+                <p>
+                  <span className="text-muted-foreground">Managed by:</span> Directory provisioning
+                  {user.scimUserName ? ` (${user.scimUserName})` : ""}. Name, email and active status follow your identity provider; roles and teams are set here.
+                </p>
+              )}
               {cfg.onboarding.enabled && (
                 <p>
                   <span className="text-muted-foreground">Onboarding:</span> {user.onboardedAt ? `Finished ${formatDateTime(user.onboardedAt, tz)}` : "Not finished"}

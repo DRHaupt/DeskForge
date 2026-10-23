@@ -354,6 +354,23 @@ Each user's page in **Administration → Users** shows when MFA was confirmed
 and when they finished onboarding.
 
 
+## `scim`
+
+User provisioning from an identity provider (Microsoft Entra, or any SCIM 2.0
+client) at `https://<host>/scim/v2`. Set-up steps are in
+DEPLOYING-A-NEW-BUSINESS.md (*Syncing users from Microsoft Entra*).
+
+| Field | Default | Notes |
+|---|---|---|
+| `enabled` | `false` | Turns on the `/scim/v2` endpoints. The token is created in **Administration → Provisioning**. |
+| `defaultRole` | `requester` | Role for people created by provisioning. Can't be `admin` or any role with full rights. Existing accounts keep their roles, and provisioning never changes roles. |
+| `sendWelcomeEmail` | `false` | Email new people their onboarding link when they're created. Needs `onboarding.enabled: true`. |
+
+Supported: Users (list with `userName`, `externalId`, `id` or `emails` `eq`
+filters, get, create, replace, PATCH, delete). Delete and `active: false`
+deactivate the account and sign the person out; nothing is erased. Groups
+aren't synced (turn off group provisioning in Entra).
+
 ---
 
 ## Environment variables (`.env`)
@@ -379,6 +396,7 @@ and when they finished onboarding.
 | `<PREFIX>_CLIENT_ID/_CLIENT_SECRET/_ISSUER` | | OIDC providers, one set per `envPrefix`. |
 | `WEBHOOK_ALLOW_PRIVATE` | `false` | Allow outgoing webhooks to private or internal addresses. |
 | `RATE_LIMIT_PER_MINUTE` | `300` | Per user, API key or IP across the API. |
+| `SCIM_RATE_LIMIT_PER_MINUTE` | `600` | Per IP for `/scim/v2` (provisioning). |
 | `CLIENT_IP_HEADER` | unset | Read the visitor's IP from this header instead of `X-Forwarded-For`, e.g. `cf-connecting-ip` behind a Cloudflare Tunnel. Only set it when the app can be reached **only** through that proxy, because clients could otherwise forge it. |
 | `TUNNEL_TOKEN` | unset | Cloudflare Tunnel token for `docker compose --profile cloudflared`. |
 | `CADDYFILE` | `Caddyfile` | For `--profile caddy`: `Caddyfile` (automatic Let's Encrypt) or `Caddyfile.cloudflare` (behind the Cloudflare proxy, with an origin certificate). |

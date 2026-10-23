@@ -248,6 +248,7 @@ services that can't pass an Access login:
 | Requesters and customers | `/`, `/portal*`, `/login`, `/signup`, `/forgot-password`, `/reset-password`, `/account*`, `/csat*`, `/api/auth*`, `/_next*`, `/branding*` | Leave open (or **Bypass**). External customers can't pass a staff-only Access login. For an internal-only help desk where everyone is in your IdP, you can protect these too. |
 | Mail provider webhook | `/api/inbound/email` | **Bypass**. It's protected by `INBOUND_EMAIL_SECRET`. |
 | Integrations | `/api/v1*` | **Bypass**, or require an Access *service token*. Calls already need a DeskForge API key. |
+| Entra user provisioning | `/scim*` | **Bypass**. Microsoft's provisioning service can't pass Access; calls need the provisioning token. |
 | Uptime checks | `/api/health` | **Bypass** (or keep it private). |
 
 Path-scoped Access applications are created under **Access → Applications →
@@ -258,7 +259,7 @@ the recipient can reach.
 **Other Cloudflare settings** (same as option D): turn off **Rocket Loader**
 and **Email Address Obfuscation** for the host, don't use "Cache Everything",
 keep `UPLOAD_MAX_MB` under Cloudflare's 100 MB request limit, and turn off
-**Bot Fight Mode** if inbound-email webhooks or API calls get challenged.
+**Bot Fight Mode** if inbound-email webhooks, provisioning or API calls get challenged.
 
 **Running `cloudflared` on the host instead** (for example if it already
 serves other sites): install it as a system service with the same token, set
@@ -393,6 +394,60 @@ page with your links. Put the link in your HR onboarding email, or send it
 from **Administration → Users → Send welcome email** (that version has their
 email pre-filled).
 
+### Syncing users from Microsoft Entra (provisioning)
+
+Instead of adding people by hand, let Entra create, update and disable their
+DeskForge accounts. This uses SCIM, the standard Entra uses for other apps.
+
+1. In `business.config.yaml`:
+
+   ```yaml
+   scim:
+     enabled: true
+     defaultRole: requester    # role for new people; promote agents in Admin → Users
+     sendWelcomeEmail: true    # optional: email new people their /welcome link (needs onboarding.enabled)
+   ```
+
+   Restart the app (`docker compose up -d app worker`).
+2. In DeskForge, open **Administration → Provisioning** and click **Generate
+   token**. Copy the token (it's shown once) and the **Tenant URL**
+   (`https://<your host>/scim/v2`).
+3. In the Entra admin center: **Enterprise applications** → the app with the
+   same name as your app registration → **Provisioning** → **Get started** (or
+   **New configuration**).
+   - Provisioning Mode: **Automatic**.
+   - Admin Credentials: paste the **Tenant URL** and **Secret Token**, then
+     click **Test Connection**. It should say the credentials are authorized.
+   - Notification Email: an admin address, so Entra tells you if provisioning fails.
+   - Save.
+4. **Mappings**:
+   - **Provision Microsoft Entra ID Groups**: set **Enabled** to **No**. Teams and
+     roles are managed in DeskForge.
+   - **Provision Microsoft Entra ID Users**: the defaults work. DeskForge uses
+     `userName` (the UPN), `active`, `displayName`, `name`, `emails[type eq "work"]`,
+     `title` and `phoneNumbers`, and ignores the rest. If people's UPN isn't their
+     email address, make sure `emails[type eq "work"].value` maps to `mail`.
+5. **Users and groups** (in the Enterprise application's menu): add the people or
+   groups who should get a help desk account. Under **Provisioning → Settings**,
+   keep Scope at **Sync only assigned users and groups**.
+6. Back on **Provisioning → Overview**, click **Start provisioning**. The first
+   cycle starts within a few minutes, then Entra syncs about every 40 minutes. To test one
+   person right away, use **Provision on demand**.
+
+What happens:
+
+| In Entra | In DeskForge |
+|---|---|
+| Person assigned to the app | Account created with `defaultRole` (or an existing account with the same email is linked). If `sendWelcomeEmail` is on, they get the welcome email. |
+| Name, email, job title or phone changed | Copied over on the next cycle. |
+| Account disabled, unassigned or deleted | Account deactivated and signed out. Tickets and history are kept. |
+| Re-enabled or re-assigned | Account reactivated. |
+
+Roles and teams never come from Entra, so promoting someone to agent in
+DeskForge sticks. Provisioning never deactivates the last admin. The
+**Provisioning** page lists recent activity; Entra's **Provisioning logs** show
+each request and any error.
+
 ## 7. File storage
 
 Attachments go to the `uploads` Docker volume by default. To use S3-compatible
@@ -483,6 +538,8 @@ because only one process can listen on ports 80 and 443.
 | Pages half-load or buttons don't work behind Cloudflare | Rocket Loader or Email Address Obfuscation is on for the host. |
 | Tunnel shows *Down* / error 1033 | `docker compose logs cloudflared`: check `TUNNEL_TOKEN`, and that the server allows outbound connections on port 7844 (or 443). |
 | Tunnel error 502 | The public hostname's service must be `http://app:3000` (container) or `http://localhost:3000` (host-installed cloudflared), and the app must be healthy. |
+| Entra "Test Connection" fails | `scim.enabled` is `true` and the app was restarted; the Tenant URL ends in `/scim/v2`; the token was copied whole (generate a new one if unsure); `/scim*` isn't behind Cloudflare Access or Bot Fight Mode. |
+| Entra provisioning log says the user already exists (409) | Another DeskForge account already uses that email and is linked to a different Entra user. Fix the email on one of them. |
 | Customers see a Cloudflare Access login | An Access application covers the portal paths; scope it to `/agent` and `/admin` (see the table in option E). |
 
 Upgrading to a new DeskForge version is covered in [`UPGRADING.md`](UPGRADING.md).

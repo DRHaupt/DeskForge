@@ -129,6 +129,8 @@ export const ENDPOINTS: Endpoint[] = [
   { method: "get", path: "/api-keys", tag: "Integrations", summary: "API keys", permission: "apikey.manage" },
   { method: "post", path: "/api-keys", tag: "Integrations", summary: "Create API key (returned once)", permission: "apikey.manage", body: apiKeySchema, status: 201 },
   { method: "delete", path: "/api-keys/{id}", tag: "Integrations", summary: "Revoke API key", permission: "apikey.manage" },
+  { method: "post", path: "/provisioning/token", tag: "Integrations", summary: "Create or replace the SCIM provisioning token (returned once)", permission: "user.manage", status: 201 },
+  { method: "delete", path: "/provisioning/token", tag: "Integrations", summary: "Revoke the SCIM provisioning token", permission: "user.manage" },
   { method: "get", path: "/canned", tag: "Integrations", summary: "Canned responses & macros", permission: "ticket.reply" },
   { method: "post", path: "/canned", tag: "Integrations", summary: "Create canned response", permission: "ticket.reply", body: cannedSchema, status: 201 },
 ];

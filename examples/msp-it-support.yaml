@@ -398,3 +398,10 @@ onboarding:
       The link below is personal to you, so please don't forward this email. If you have any trouble, reply to this message or contact {{supportEmail}}.
     buttonLabel: Set up your account
     signature: ["Thank you,", "IT Support"]
+
+# Sync accounts from Microsoft Entra (SCIM provisioning). Create the token in
+# Administration → Provisioning; Entra steps are in DEPLOYING-A-NEW-BUSINESS.md.
+scim:
+  enabled: false
+  defaultRole: requester
+  sendWelcomeEmail: false

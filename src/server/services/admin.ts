@@ -167,6 +167,8 @@ export async function getUser(actor: Actor, id: string) {
       passwordHash: true,
       createdAt: true,
       onboardedAt: true,
+      provisionedVia: true,
+      scimUserName: true,
       mfaVerifiedAt: true,
       mfaVerifiedVia: true,
       identities: { select: { provider: true, createdAt: true } },
